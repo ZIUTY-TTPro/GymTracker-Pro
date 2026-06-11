@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>GymTracker Pro</title>
+    <link rel="manifest" href="manifest.json">
+	<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+	<link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="stylesheet" href="style.css">
+<base target="_blank">
+</head>
+<body>
+    <div id="app">
+        <!-- HEADER -->
+        <header id="header">
+            <button id="btn-back" class="icon-btn hidden">&#8592;</button>
+            <h1 id="page-title">GymTracker Pro</h1>
+            <!-- <button id="btn-menu" class="icon-btn">&#9776;</button> -->
+        </header>
+
+        <!-- MAIN CONTENT -->
+        <main id="main">
+            <!-- SCREEN: HOME -->
+            <section id="screen-home" class="screen active">
+                <div class="section-header">
+                    <h2 data-key="my_workouts">Moje Treningi</h2>
+                    <button id="btn-new-workout" class="btn-primary" data-key="new_workout">+ Nowy Trening</button>
+                </div>
+                <div id="workouts-list" class="card-list"></div>
+
+                <div class="section-header mt-2">
+                    <h2 data-key="exercise_library">Biblioteka Cwiczen</h2>
+                    <button id="btn-new-exercise" class="btn-secondary" data-key="new_exercise">+ Cwiczenie</button>
+                </div>
+                <div id="exercises-list" class="card-list"></div>
+            </section>
+
+            <!-- SCREEN: DEFINIOWANIE CWICZENIA -->
+            <section id="screen-exercise-form" class="screen">
+                <h2 data-key="define_exercise">Definiuj Cwiczenie</h2>
+                <form id="exercise-form">
+                    <input type="hidden" id="ex-id">
+                    <div class="form-group">
+                        <label data-key="exercise_name">Nazwa cwiczenia</label>
+                        <input type="text" id="ex-name" required data-placeholder-key="exercise_placeholder" placeholder="np. Wyciskanie sztangi">
+                    </div>
+                    <div class="form-group">
+                        <label data-key="muscle_group">Grupa miesniowa</label>
+                        <select id="ex-muscle">
+                            <option value="Klatka piersiowa">Klatka piersiowa</option>
+                            <option value="Plecy">Plecy</option>
+                            <option value="Barki">Barki</option>
+                            <option value="Biceps">Biceps</option>
+                            <option value="Triceps">Triceps</option>
+                            <option value="Nogi">Nogi</option>
+                            <option value="Brzuch">Brzuch</option>
+                            <option value="Inne">Inne</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-key="weight">Waga domyslna (kg)</label>
+                        <div class="number-input">
+                            <button type="button" class="btn-minus" onclick="adjustValue('ex-weight', -2.5)">&#8722;</button>
+                            <input type="number" id="ex-weight" value="20" step="0.5" min="0">
+                            <button type="button" class="btn-plus" onclick="adjustValue('ex-weight', 2.5)">+</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label data-key="reps">Powtorzenia domyslne</label>
+                        <div class="number-input">
+                            <button type="button" class="btn-minus" onclick="adjustValue('ex-reps', -1)">&#8722;</button>
+                            <input type="number" id="ex-reps" value="8" min="1" max="100">
+                            <button type="button" class="btn-plus" onclick="adjustValue('ex-reps', 1)">+</button>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary btn-large" data-key="save">Zapisz</button>
+                        <button type="button" id="btn-cancel-exercise" class="btn-secondary" data-key="cancel">Anuluj</button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- SCREEN: DEFINIOWANIE TRENINGU -->
+            <section id="screen-workout-form" class="screen">
+                <h2 data-key="define_workout">Definiuj Trening</h2>
+                <form id="workout-form">
+                    <input type="hidden" id="wo-id">
+                    <div class="form-group">
+                        <label data-key="workout_name">Nazwa treningu</label>
+                        <input type="text" id="wo-name" required data-placeholder-key="workout_placeholder" placeholder="np. Piers i Biceps">
+                    </div>
+                    <div class="form-group">
+                        <label data-key="global_sets">Liczba serii (dla wszystkich cwiczen)</label>
+                        <div class="number-input">
+                            <button type="button" class="btn-minus" onclick="adjustValue('wo-sets', -1)">&#8722;</button>
+                            <input type="number" id="wo-sets" value="4" min="1" max="20">
+                            <button type="button" class="btn-plus" onclick="adjustValue('wo-sets', 1)">+</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label data-key="rest_time">Przerwa miedzy seriami (sek)</label>
+                        <div class="number-input">
+                            <button type="button" class="btn-minus" onclick="adjustValue('wo-rest', -15)">&#8722;</button>
+                            <input type="number" id="wo-rest" value="90" min="0" max="600" step="15">
+                            <button type="button" class="btn-plus" onclick="adjustValue('wo-rest', 15)">+</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label data-key="select_exercises">Wybierz cwiczenia:</label>
+                        <div id="wo-exercises-select" class="exercises-select"></div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary btn-large" data-key="save">Zapisz Trening</button>
+                        <button type="button" id="btn-cancel-workout" class="btn-secondary" data-key="cancel">Anuluj</button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- SCREEN: AKTYWNY TRENING -->
+            <section id="screen-active-workout" class="screen">
+                <!-- PAUSE OVERLAY -->
+                <div id="pause-overlay" class="pause-overlay hidden">
+                    <div class="pause-content">
+                        <div class="pause-icon">&#9208;</div>
+                        <h2 data-key="workout_paused">Trening Wstrzymany</h2>
+                        <p data-key="click_to_resume">Kliknij aby wznowić</p>
+                        <button id="btn-resume" class="btn-primary btn-large" data-key="resume_workout">Wznów Trening</button>
+                    </div>
+                </div>
+
+                <div class="workout-header">
+                    <div class="timer-display" id="session-timer-box">
+                        <span class="timer-icon">&#9201;</span>
+                        <span id="session-timer">0:00</span>
+                    </div>
+                    <button id="btn-pause-workout" class="btn-icon-small" title="Zatrzymaj">&#9208;</button>
+                    <div class="rest-display">
+                        <span class="rest-icon">&#9202;</span>
+                        <span id="rest-timer">--:--</span>
+                    </div>
+                </div>
+
+                <!-- RUNDA - duży numer + przyciski -->
+                <div class="round-banner">
+                    <div class="round-info">
+                        <span class="round-label" data-key="round">Runda</span>
+                        <div class="round-controls">
+                            <button type="button" class="btn-round-minus" id="btn-rounds-minus">&#8722;</button>
+                            <span id="current-round" class="round-num">1</span>
+                            <span class="round-sep">/</span>
+                            <span id="total-rounds" class="round-total">8</span>
+                            <button type="button" class="btn-round-plus" id="btn-rounds-plus">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PRZERWA -->
+                <div class="edit-row">
+                    <span class="edit-label" data-key="rest_label">Przerwa:</span>
+                    <div class="number-input small">
+                        <button type="button" class="btn-minus" id="btn-rest-minus">&#8722;</button>
+                        <input type="number" id="quick-rest" value="90" min="0" max="600" step="15">
+                        <span class="unit">s</span>
+                        <button type="button" class="btn-plus" id="btn-rest-plus">+</button>
+                    </div>
+                </div>
+
+                <!-- CHECK ALL -->
+                <div class="check-all-row">
+                    <label class="check-all-label">
+                        <input type="checkbox" id="check-all-exercises">
+                        <span data-key="check_all_exercises">Zaznacz wszystkie ćwiczenia</span>
+                    </label>
+                </div>
+
+                <div class="superset-table-container">
+                    <table id="superset-table" class="superset-table">
+                        <thead>
+                            <tr>
+                                <th data-key="exercise">Ćwiczenie</th>
+                                <th data-key="weight">Waga</th>
+                                <th data-key="reps">Powtórzenia</th>
+                                <th data-key="done">Zrobione</th>
+                            </tr>
+                        </thead>
+                        <tbody id="superset-tbody"></tbody>
+                    </table>
+                </div>
+
+                <div class="rest-countdown" id="rest-countdown">
+                    <span data-key="next_round_in">Następna runda za:</span>
+                    <span id="rest-seconds" class="rest-big">90</span>
+                </div>
+
+                <button id="btn-complete-round" class="btn-complete-round">
+                    <span data-key="complete_round">ZAKOŃCZ RUNDĘ</span>
+                </button>
+
+                <div class="workout-actions">
+                    <button id="btn-finish-workout" class="btn-text btn-danger" data-key="finish_workout">Zakończ trening</button>
+                </div>
+            </section>
+
+            <!-- SCREEN: STATYSTYKI -->
+            <section id="screen-stats" class="screen">
+                <h2 data-key="statistics">Statystyki</h2>
+                <div class="stats-info">
+                    <p data-key="stats_info">Wybierz cwiczenie aby zobaczyc jak zmienial sie Twoj ciezar w czasie. Wykres pokazuje <strong>najwiekszy ciezar</strong> z kazdego treningu dla danego cwiczenia.</p>
+                </div>
+                <div class="stats-tabs">
+                    <button class="tab-btn active" data-tab="weight-chart" data-key="weight_progress">Postep ciezaru</button>
+                    <button class="tab-btn" data-tab="volume-chart" data-key="volume">Objetosc</button>
+                </div>
+                <div class="form-group">
+                    <label data-key="select_exercise">Wybierz cwiczenie:</label>
+                    <select id="stats-exercise-select"></select>
+                </div>
+                <div class="chart-container">
+                    <canvas id="main-chart"></canvas>
+                </div>
+                <div class="stats-summary" id="stats-summary"></div>
+            </section>
+
+            <!-- SCREEN: POMIARY CIAŁA -->
+            <section id="screen-measurements" class="screen">
+                <h2 data-key="body_measurements">Pomiary Ciala</h2>
+                <form id="measurements-form">
+                    <div class="form-group">
+                        <label data-key="date">Data</label>
+                        <input type="date" id="ms-date" required>
+                    </div>
+                    <div class="measurements-grid">
+                        <div class="form-group">
+                            <label data-key="chest">Klatka (cm)</label>
+                            <input type="number" id="ms-chest" step="0.1" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label data-key="biceps_right">Biceps P (cm)</label>
+                            <input type="number" id="ms-biceps-right" step="0.1" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label data-key="biceps_left">Biceps L (cm)</label>
+                            <input type="number" id="ms-biceps-left" step="0.1" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label data-key="thigh_right">Udo P (cm)</label>
+                            <input type="number" id="ms-thigh-right" step="0.1" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label data-key="thigh_left">Udo L (cm)</label>
+                            <input type="number" id="ms-thigh-left" step="0.1" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label data-key="waist">Talia (cm)</label>
+                            <input type="number" id="ms-waist" step="0.1" min="0">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary btn-large" data-key="save">Zapisz Pomiar</button>
+                    </div>
+                </form>
+                <div class="chart-container mt-2">
+                    <canvas id="measurements-chart"></canvas>
+                </div>
+                <div id="measurements-history" class="history-list"></div>
+            </section>
+
+            <!-- SCREEN: HISTORIA TRENINGOW -->
+            <section id="screen-history" class="screen">
+                <h2 data-key="workout_history">Historia Treningow</h2>
+                <div id="history-list" class="history-list"></div>
+            </section>
+
+            <!-- SCREEN: USTAWIENIA -->
+            <section id="screen-settings" class="screen">
+                <h2 data-key="settings">Ustawienia</h2>
+                <div class="settings-group">
+                    <h3 data-key="appearance">Wyglad</h3>
+                    <div class="setting-row">
+                        <label data-key="dark_mode">Tryb ciemny</label>
+                        <label class="toggle">
+                            <input type="checkbox" id="toggle-dark" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-row">
+                        <label data-key="language">Jezyk</label>
+                        <select id="lang-select">
+                            <option value="pl">Polski</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <h3 data-key="data">Dane</h3>
+                    <button id="btn-export" class="btn-secondary btn-full" data-key="export_data">Eksportuj dane (JSON)</button>
+                    <button id="btn-import" class="btn-secondary btn-full mt-1" data-key="import_data">Importuj dane (JSON)</button>
+                    <input type="file" id="import-file" accept=".json" class="hidden">
+                </div>
+            </section>
+        </main>
+
+        <!-- BOTTOM NAV -->
+        <nav id="bottom-nav" class="hidden">
+            <button class="nav-btn active" data-screen="screen-home">
+                <span class="nav-icon">&#127968;</span>
+                <span class="nav-label" data-key="home">Start</span>
+            </button>
+            <button class="nav-btn" data-screen="screen-stats">
+                <span class="nav-icon">&#128202;</span>
+                <span class="nav-label" data-key="stats">Statystyki</span>
+            </button>
+            <button class="nav-btn" data-screen="screen-measurements">
+                <span class="nav-icon">&#128207;</span>
+                <span class="nav-label" data-key="measurements">Pomiary</span>
+            </button>
+            <button class="nav-btn" data-screen="screen-history">
+                <span class="nav-icon">&#128203;</span>
+                <span class="nav-label" data-key="history">Historia</span>
+            </button>
+            <button class="nav-btn" data-screen="screen-settings">
+                <span class="nav-icon">&#9881;</span>
+                <span class="nav-label" data-key="settings">Ustawienia</span>
+            </button>
+        </nav>
+
+        <!-- TOAST NOTIFICATIONS -->
+        <div id="toast-container"></div>
+    </div>
+
+    <!-- MODAL KONFIRMACJI -->
+    <div id="confirm-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-icon">🏋️</div>
+            <h3 id="modal-title" data-key="confirm_finish_workout">Zakończyć trening?</h3>
+            <div class="modal-buttons">
+                <button id="modal-cancel" class="modal-btn modal-btn-cancel" data-key="cancel">Anuluj</button>
+                <button id="modal-confirm" class="modal-btn modal-btn-confirm" data-key="finish_workout">Zakończ</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="chart.umd.min.js"></script>
+    <script src="db.js"></script>
+    <script src="translations.js"></script>
+    <script src="timer.js"></script>
+    <script src="charts.js"></script>
+    <script src="ui.js"></script>
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/GymTracker-Pro/service-worker.js')
+    .then(reg => console.log('SW registered'))
+    .catch(err => console.log('SW error:', err));
+}
+    </script>
+</body>
+</html>
