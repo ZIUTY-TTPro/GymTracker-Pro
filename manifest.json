@@ -4,7 +4,7 @@
   "description": "Profesjonalny tracker treningów siłowych",
   "start_url": "./",
   "scope": "./",
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
   "display": "standalone",
   "background_color": "#1a1a2e",
   "theme_color": "#1a1a2e",
