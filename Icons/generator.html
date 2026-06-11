@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generator ikon GymTracker Pro</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background: #0d0d1a;
+            color: white;
+        }
+        .container {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+        }
+        .box {
+            background: #16162a;
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+        }
+        canvas {
+            display: block;
+            margin: 10px auto;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        button {
+            background: #ff3366;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        h2 {
+            color: #ff3366;
+        }
+        p {
+            color: #8888a0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🏋️ GymTracker Pro - Generator Ikon</h1>
+    <p>Kliknij przycisk "Pobierz" pod każdym obrazkiem</p>
+    
+    <div class="container">
+        <div class="box">
+            <h2>192x192</h2>
+            <canvas id="icon192" width="192" height="192"></canvas>
+            <button onclick="downloadCanvas('icon192', 'icon-192.png')">Pobierz 192x192</button>
+        </div>
+        
+        <div class="box">
+            <h2>512x512</h2>
+            <canvas id="icon512" width="512" height="512"></canvas>
+            <button onclick="downloadCanvas('icon512', 'icon-512.png')">Pobierz 512x512</button>
+        </div>
+    </div>
+
+    <script>
+        // TWÓJ ORYGINALNY KOD SVG - nie zmieniam nic
+        const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff3366"/>
+      <stop offset="100%" stop-color="#00d4aa"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="22" fill="url(#grad)"/>
+  <rect x="22" y="44" width="56" height="10" rx="4" fill="white"/>
+  <rect x="14" y="36" width="12" height="26" rx="3" fill="white"/>
+  <rect x="8" y="40" width="10" height="18" rx="2" fill="white" opacity="0.6"/>
+  <rect x="74" y="36" width="12" height="26" rx="3" fill="white"/>
+  <rect x="82" y="40" width="10" height="18" rx="2" fill="white" opacity="0.6"/>
+  <text x="50" y="35" font-size="22" text-anchor="middle" fill="white" font-weight="900" font-family="Arial, sans-serif">GT</text>
+  <text x="50" y="80" font-size="16" text-anchor="middle" fill="white" font-weight="900" font-family="Arial, sans-serif">PRO</text>
+</svg>`;
+
+        function svgToPng(svg, width, height, callback) {
+            const img = new Image();
+            const blob = new Blob([svg], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                URL.revokeObjectURL(url);
+                callback(canvas);
+            };
+            img.src = url;
+        }
+
+        // Generuj 192x192
+        svgToPng(svgString, 192, 192, function(canvas) {
+            document.getElementById('icon192').getContext('2d').drawImage(canvas, 0, 0);
+            window.canvas192 = canvas;
+        });
+
+        // Generuj 512x512
+        svgToPng(svgString, 512, 512, function(canvas) {
+            document.getElementById('icon512').getContext('2d').drawImage(canvas, 0, 0);
+            window.canvas512 = canvas;
+        });
+
+        function downloadCanvas(canvasId, filename) {
+            let canvas;
+            if (canvasId === 'icon192') canvas = window.canvas192;
+            if (canvasId === 'icon512') canvas = window.canvas512;
+            if (!canvas) return;
+            
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+    </script>
+    
+    <p style="margin-top: 40px; font-size: 12px;">✅ Po pobraniu wrzuć pliki do folderu "icons" w projekcie</p>
+</body>
+</html>
