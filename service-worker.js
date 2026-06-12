@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gymtracker-v1.0.1';
+const CACHE_NAME = 'gymtracker-v1.0.6'; // ZMIEŃ wersję przy każdej aktualizacji!
 const urlsToCache = [
   './',
   './index.html',
@@ -17,9 +17,6 @@ const urlsToCache = [
 
 const offlineFallbackPage = './index.html';
 
-// ==========================
-// INSTALL
-// ==========================
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
@@ -27,9 +24,6 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// ==========================
-// ACTIVATE
-// ==========================
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
@@ -44,18 +38,13 @@ self.addEventListener('activate', event => {
   );
 });
 
-// ==========================
-// OFFLINE SUPPORT (Has Logic)
-// ==========================
 self.addEventListener('fetch', event => {
   if (event.request.mode === 'navigate') {
     event.respondWith(
       (async () => {
         try {
           const preloadResp = await event.preloadResponse;
-          if (preloadResp) {
-            return preloadResp;
-          }
+          if (preloadResp) return preloadResp;
           const networkResp = await fetch(event.request);
           return networkResp;
         } catch (error) {
@@ -76,27 +65,18 @@ self.addEventListener('fetch', event => {
   }
 });
 
-// ==========================
-// BACKGROUND SYNC (puste, dla PWA Builder)
-// ==========================
 self.addEventListener('sync', event => {
   if (event.tag === 'sync-workouts') {
     event.waitUntil(Promise.resolve());
   }
 });
 
-// ==========================
-// PERIODIC SYNC (puste, dla PWA Builder)
-// ==========================
 self.addEventListener('periodicsync', event => {
   if (event.tag === 'periodic-sync') {
     event.waitUntil(Promise.resolve());
   }
 });
 
-// ==========================
-// PUSH NOTIFICATIONS (puste, dla PWA Builder)
-// ==========================
 self.addEventListener('push', event => {
   event.waitUntil(Promise.resolve());
 });
