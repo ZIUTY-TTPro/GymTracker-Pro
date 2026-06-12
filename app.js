@@ -1,30 +1,107 @@
-// Rejestracja Service Worker + auto-refresh przy aktualizacji
+// Rejestracja Service Worker + aktualizacje
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./service-worker.js').then(registration => {
     registration.addEventListener('updatefound', () => {
       const newWorker = registration.installing;
       newWorker.addEventListener('statechange', () => {
         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          // Pokaż komunikat o dostępnej aktualizacji
-          showToast('Dostępna jest nowa wersja! Kliknij, aby zaktualizować.', 'info');
-          // Znajdź ostatni toast i dodaj do niego event kliknięcia
-          setTimeout(() => {
-            const toasts = document.querySelectorAll('.toast');
-            const lastToast = toasts[toasts.length - 1];
-            if (lastToast) {
-              lastToast.style.cursor = 'pointer';
-              lastToast.onclick = () => {
-                newWorker.postMessage({ type: 'SKIP_WAITING' });
-                window.location.reload();
-              };
-            }
-          }, 100);
+          // POKAŻ TRWAŁY KOMUNIKAT Z PRZYCISKIEM
+          showUpdateNotification(newWorker);
         }
       });
     });
   });
 }
 
+// Funkcja pokazująca trwały komunikat aktualizacji
+function showUpdateNotification(newWorker) {
+  // Sprawdź czy już istnieje taki komunikat
+  if (document.getElementById('update-banner')) return;
+  
+  // Stwórz banner
+  const banner = document.createElement('div');
+  banner.id = 'update-banner';
+  banner.innerHTML = `
+    <div class="update-banner-content">
+      <span class="update-icon">🔄</span>
+      <span class="update-text">Dostępna jest nowa wersja aplikacji!</span>
+      <button id="update-now-btn" class="update-btn">AKTUALIZUJ</button>
+    </div>
+  `;
+  banner.style.cssText = `
+    position: fixed;
+    bottom: 80px;
+    left: 16px;
+    right: 16px;
+    background: var(--surface);
+    border: 2px solid var(--primary);
+    border-radius: var(--radius);
+    padding: 16px;
+    z-index: 10000;
+    box-shadow: var(--shadow);
+    animation: slideUp 0.3s ease;
+  `;
+  
+  // Dodaj style dla animacji
+  if (!document.querySelector('#update-banner-styles')) {
+    const style = document.createElement('style');
+    style.id = 'update-banner-styles';
+    style.textContent = `
+      @keyframes slideUp {
+        from { transform: translateY(100px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+      .update-banner-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .update-icon {
+        font-size: 24px;
+      }
+      .update-text {
+        flex: 1;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .update-btn {
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: var(--radius-sm);
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform 0.2s;
+      }
+      .update-btn:active {
+        transform: scale(0.97);
+      }
+      @media (max-width: 480px) {
+        .update-banner-content {
+          flex-direction: column;
+          text-align: center;
+        }
+        .update-btn {
+          width: 100%;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  
+  document.body.appendChild(banner);
+  
+  // Obsługa kliknięcia przycisku
+  document.getElementById('update-now-btn').addEventListener('click', () => {
+    newWorker.postMessage({ type: 'SKIP_WAITING' });
+    window.location.reload();
+  });
+}
+
+// Reszta kodu app.js pozostaje BEZ ZMIAN (poniżej)
 const AppState = {
   currentScreen: 'screen-home',
   darkMode: true,
