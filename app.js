@@ -446,7 +446,7 @@ function showInstallButton() {
     btn = document.createElement('button');
     btn.id = 'pwa-install-btn';
     btn.textContent = 'Zainstaluj aplikację';
-    btn.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;padding:12px 24px;background:#00d4aa;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+    btn.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;padding:12px 24px;background:#00d4aa;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);display:none;';
     document.body.appendChild(btn);
   }
   btn.style.display = 'block';
