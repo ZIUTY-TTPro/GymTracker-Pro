@@ -24,7 +24,7 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
   );
-  self.skipWaiting();
+  self.skipWaiting(); // Wymusza natychmiastową aktywację nowego SW
 });
 
 // ==========================
@@ -40,30 +40,30 @@ self.addEventListener('activate', event => {
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(() => self.clients.claim()) // Nowy SW przejmuje kontrolę natychmiast
   );
 });
 
 // ==========================
-// OFFLINE SUPPORT (Has Logic)
+// OFFLINE SUPPORT (Improved - always try network first for navigation)
 // ==========================
 self.addEventListener('fetch', event => {
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      (async () => {
-        try {
-          const preloadResp = await event.preloadResponse;
-          if (preloadResp) {
-            return preloadResp;
-          }
-          const networkResp = await fetch(event.request);
-          return networkResp;
-        } catch (error) {
+      fetch(event.request)
+        .then(response => {
+          // Jeśli udało się pobrać z sieci, zaktualizuj cache
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, copy);
+          });
+          return response;
+        })
+        .catch(async () => {
           const cache = await caches.open(CACHE_NAME);
           const cachedResp = await cache.match(offlineFallbackPage);
           return cachedResp;
-        }
-      })()
+        })
     );
   } else {
     event.respondWith(
@@ -126,4 +126,13 @@ self.addEventListener('notificationclick', event => {
   event.waitUntil(
     clients.openWindow(event.notification.data || './')
   );
+});
+
+// ==========================
+// MESSAGE HANDLER (for update notification)
+// ==========================
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
