@@ -146,7 +146,9 @@ const translations = {
 done_count_finish_round: "{0}/{1} zrobione - ZAKOŃCZ RUNDĘ",
     database_error: "Błąd bazy danych",
     light_mode: "Tryb jasny",
-    stats_info: "Wybierz ćwiczenie aby zobaczyć jak zmieniał się Twój ciężar w czasie. Wykres pokazuje największy ciężar z każdego treningu dla danego ćwiczenia."
+    stats_info: "Wybierz ćwiczenie aby zobaczyć jak zmieniał się Twój ciężar w czasie. Wykres pokazuje największy ciężar z każdego treningu dla danego ćwiczenia.",
+	app_version: "Wersja aplikacji",
+check_updates: "Sprawdź aktualizacje"
   },
 
   en: {
@@ -276,7 +278,9 @@ done_count_finish_round: "{0}/{1} zrobione - ZAKOŃCZ RUNDĘ",
     done_count_finish_round: "{0}/{1} done - COMPLETE ROUND",
     database_error: "Database error",
     light_mode: "Light mode",
-    stats_info: "Select an exercise to see how your weight changed over time. The chart shows the heaviest weight from each workout for the selected exercise."
+    stats_info: "Select an exercise to see how your weight changed over time. The chart shows the heaviest weight from each workout for the selected exercise.",
+	app_version: "App version",
+check_updates: "Check for updates"
   }
 };
 
