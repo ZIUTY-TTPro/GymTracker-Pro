@@ -452,3 +452,11 @@ window.addEventListener('appinstalled', () => {
   if (btn) btn.style.display = 'none';
   console.log('Aplikacja zainstalowana');
 });
+// Auto-refresh przy aktualizacji SW
+let refreshing = false;
+navigator.serviceWorker.addEventListener('controllerchange', () => {
+  if (!refreshing) {
+    refreshing = true;
+    window.location.reload();
+  }
+});
