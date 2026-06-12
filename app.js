@@ -414,3 +414,41 @@ showScreen = function(screenId, title) {
   AppState.isWorkoutActive = (screenId === 'screen-active-workout');
   originalShowScreen(screenId, title);
 };
+
+// ==========================
+// PWA INSTALL PROMPT
+// ==========================
+let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  showInstallButton();
+});
+
+function showInstallButton() {
+  let btn = document.getElementById('pwa-install-btn');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'pwa-install-btn';
+    btn.textContent = 'Zainstaluj aplikację';
+    btn.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;padding:12px 24px;background:#00d4aa;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+    document.body.appendChild(btn);
+  }
+  btn.style.display = 'block';
+  btn.onclick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      btn.style.display = 'none';
+    }
+  };
+}
+
+window.addEventListener('appinstalled', () => {
+  deferredPrompt = null;
+  const btn = document.getElementById('pwa-install-btn');
+  if (btn) btn.style.display = 'none';
+  console.log('Aplikacja zainstalowana');
+});
