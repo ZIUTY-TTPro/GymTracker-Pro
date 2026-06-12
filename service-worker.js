@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gymtracker-v1.0.6'; // ZMIEŃ wersję przy każdej aktualizacji!
+const CACHE_NAME = 'gymtracker-v1.0.0'; // ZMIEŃ wersję przy każdej aktualizacji!
 const urlsToCache = [
   './',
   './index.html',
