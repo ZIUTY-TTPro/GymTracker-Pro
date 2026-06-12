@@ -1,38 +1,120 @@
-// Rejestracja Service Worker - BEZ automatycznego przeładowania
+// ============================================
+// ZARZĄDZANIE WERSJĄ I AKTUALIZACJAMI
+// ============================================
+
+const APP_VERSION = '1.1.0'; // Zwiększaj przy każdej zmianie
+let swRegistration = null;
 let updateBannerShown = false;
 
+// Rejestracja Service Worker
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./service-worker.js').then(registration => {
-    console.log('SW registered');
+    swRegistration = registration;
+    console.log('SW registered:', registration);
+    updateSWStatus();
     
     // Sprawdź czy już jest nowy worker czekający
     if (registration.waiting) {
       showUpdateBanner(registration.waiting);
+      updateSWStatus();
     }
     
     // Nasłuchuj na nowego workera
     registration.addEventListener('updatefound', () => {
+      console.log('Update found!');
       const newWorker = registration.installing;
+      updateSWStatus('Pobieranie aktualizacji...');
+      
       newWorker.addEventListener('statechange', () => {
+        console.log('Worker state:', newWorker.state);
+        updateSWStatus(`Stan: ${newWorker.state}`);
+        
         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
           showUpdateBanner(newWorker);
+          updateSWStatus('Aktualizacja gotowa!');
         }
       });
     });
   });
   
+  // Nasłuchuj na komunikaty
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    console.log('Message from SW:', event.data);
+  });
+  
   // Sprawdź przy każdym załadowaniu
   navigator.serviceWorker.ready.then(registration => {
+    swRegistration = registration;
     if (registration.waiting) {
       showUpdateBanner(registration.waiting);
     }
+    updateSWStatus();
   });
 }
 
-// Funkcja pokazująca banner - NIGDY nie znika automatycznie
+// Funkcja aktualizująca status SW w UI
+function updateSWStatus(text) {
+  const swSpan = document.getElementById('sw-status');
+  const versionSpan = document.getElementById('app-version');
+  
+  if (versionSpan) {
+    versionSpan.textContent = `v${APP_VERSION}`;
+  }
+  
+  if (swSpan) {
+    if (text) {
+      swSpan.textContent = text;
+    } else if (swRegistration) {
+      if (swRegistration.waiting) {
+        swSpan.innerHTML = '<span style="color: #ffb347;">⚠️ Aktualizacja gotowa</span>';
+      } else if (swRegistration.active) {
+        swSpan.innerHTML = '<span style="color: #00d4aa;">✅ Aktywny</span>';
+      } else {
+        swSpan.textContent = 'Rejestracja...';
+      }
+    } else {
+      swSpan.textContent = 'Brak Service Worker';
+    }
+  }
+}
+
+// Ręczne sprawdzanie aktualizacji
+async function checkForUpdates() {
+  if (!swRegistration) {
+    showToast('Service Worker nie jest zarejestrowany', 'error');
+    return;
+  }
+  
+  showToast('Sprawdzanie aktualizacji...', 'info');
+  updateSWStatus('Sprawdzanie...');
+  
+  try {
+    // Wymuś sprawdzenie aktualizacji
+    await swRegistration.update();
+    
+    if (swRegistration.waiting) {
+      showUpdateBanner(swRegistration.waiting);
+      showToast('Znaleziono aktualizację!', 'success');
+      updateSWStatus('Aktualizacja gotowa!');
+    } else {
+      showToast('Brak nowych aktualizacji', 'info');
+      updateSWStatus('✅ Aktualny');
+    }
+  } catch (err) {
+    console.error('Update check failed:', err);
+    showToast('Błąd sprawdzania aktualizacji', 'error');
+    updateSWStatus('❌ Błąd');
+  }
+}
+
+// Funkcja pokazująca banner - NIGDY nie znika
 function showUpdateBanner(worker) {
   if (updateBannerShown) return;
   updateBannerShown = true;
+  
+  // Ukryj stary banner jeśli istnieje
+  const oldBanner = document.getElementById('update-banner');
+  if (oldBanner) oldBanner.remove();
   
   const banner = document.createElement('div');
   banner.id = 'update-banner';
@@ -41,9 +123,10 @@ function showUpdateBanner(worker) {
       <span style="font-size: 28px;">🔄</span>
       <div style="flex: 1;">
         <div style="font-weight: bold;">Nowa wersja dostępna!</div>
-        <div style="font-size: 12px; opacity: 0.7;">Kliknij przycisk, aby zaktualizować</div>
+        <div style="font-size: 12px; opacity: 0.7;">Wersja ${APP_VERSION} → nowsza</div>
       </div>
-      <button id="do-update" style="background: #ff3366; color: white; border: none; padding: 10px 20px; border-radius: 30px; font-weight: bold; cursor: pointer;">AKTUALIZUJ</button>
+      <button id="do-update" style="background: #ff3366; color: white; border: none; padding: 10px 20px; border-radius: 30px; font-weight: bold; cursor: pointer;">AKTUALIZUJ TERAZ</button>
+      <button id="dismiss-update" style="background: none; color: #888; border: 1px solid #888; padding: 10px 20px; border-radius: 30px; cursor: pointer;">Później</button>
     </div>
   `;
   
@@ -58,15 +141,32 @@ function showUpdateBanner(worker) {
     z-index: 999999;
     box-shadow: 0 -5px 20px rgba(0,0,0,0.3);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    backdrop-filter: blur(10px);
   `;
   
   document.body.appendChild(banner);
   
   document.getElementById('do-update').onclick = () => {
+    showToast('Aktualizacja...', 'info');
     worker.postMessage({ type: 'SKIP_WAITING' });
-    window.location.reload();
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   };
+  
+  document.getElementById('dismiss-update').onclick = () => {
+    banner.remove();
+    updateBannerShown = false;
+    showToast('Aktualizację można wykonać później w Ustawieniach', 'info');
+  };
+  
+  // Aktualizuj status w ustawieniach
+  updateSWStatus('⚠️ Aktualizacja gotowa');
 }
+
+// ============================================
+// RESZTA ORYGINALNEGO KODU APP.JS
+// ============================================
 
 const AppState = {
   currentScreen: 'screen-home',
@@ -423,6 +523,11 @@ function setupEventListeners() {
     if (!document.hidden && audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume();
     }
+  });
+
+  // Przycisk sprawdzania aktualizacji
+  document.getElementById('check-updates-btn')?.addEventListener('click', () => {
+    checkForUpdates();
   });
 }
 
