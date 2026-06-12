@@ -1,3 +1,17 @@
+// Rejestracja Service Worker + auto-refresh przy aktualizacji
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./service-worker.js').then(registration => {
+    registration.addEventListener('updatefound', () => {
+      const newWorker = registration.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          window.location.reload();
+        }
+      });
+    });
+  });
+}
+
 const AppState = {
   currentScreen: 'screen-home',
   darkMode: true,
@@ -451,12 +465,4 @@ window.addEventListener('appinstalled', () => {
   const btn = document.getElementById('pwa-install-btn');
   if (btn) btn.style.display = 'none';
   console.log('Aplikacja zainstalowana');
-});
-// Auto-refresh przy aktualizacji SW
-let refreshing = false;
-navigator.serviceWorker.addEventListener('controllerchange', () => {
-  if (!refreshing) {
-    refreshing = true;
-    window.location.reload();
-  }
 });
