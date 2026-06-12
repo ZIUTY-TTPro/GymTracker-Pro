@@ -5,103 +5,142 @@ if ('serviceWorker' in navigator) {
       const newWorker = registration.installing;
       newWorker.addEventListener('statechange', () => {
         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          // POKAŻ TRWAŁY KOMUNIKAT Z PRZYCISKIEM
-          showUpdateNotification(newWorker);
+          // POKAŻ TRWAŁY KOMUNIKAT - NIGDY NIE ZNIKA
+          showPersistentUpdateBanner(newWorker);
         }
       });
     });
   });
 }
 
-// Funkcja pokazująca trwały komunikat aktualizacji
-function showUpdateNotification(newWorker) {
-  // Sprawdź czy już istnieje taki komunikat
-  if (document.getElementById('update-banner')) return;
+// Funkcja pokazująca PRAWdziwie trwały banner (NIGDY nie znika)
+function showPersistentUpdateBanner(newWorker) {
+  // Usuń stary banner jeśli istnieje
+  const oldBanner = document.getElementById('persistent-update-banner');
+  if (oldBanner) oldBanner.remove();
   
   // Stwórz banner
   const banner = document.createElement('div');
-  banner.id = 'update-banner';
+  banner.id = 'persistent-update-banner';
   banner.innerHTML = `
-    <div class="update-banner-content">
-      <span class="update-icon">🔄</span>
-      <span class="update-text">Dostępna jest nowa wersja aplikacji!</span>
-      <button id="update-now-btn" class="update-btn">AKTUALIZUJ</button>
+    <div class="update-banner-inner">
+      <div class="update-banner-icon">🔄</div>
+      <div class="update-banner-text">
+        <strong>Nowa wersja dostępna!</strong>
+        <small>Kliknij przycisk, aby zaktualizować aplikację</small>
+      </div>
+      <button id="force-update-btn" class="update-banner-btn">AKTUALIZUJ TERAZ</button>
     </div>
   `;
+  
+  // Style - bardzo agresywne, żeby nikt nie mógł go ukryć
   banner.style.cssText = `
-    position: fixed;
-    bottom: 80px;
-    left: 16px;
-    right: 16px;
-    background: var(--surface);
-    border: 2px solid var(--primary);
-    border-radius: var(--radius);
-    padding: 16px;
-    z-index: 10000;
-    box-shadow: var(--shadow);
-    animation: slideUp 0.3s ease;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%) !important;
+    border-top: 3px solid #ff3366 !important;
+    padding: 16px 20px !important;
+    z-index: 999999 !important;
+    box-shadow: 0 -5px 25px rgba(0,0,0,0.5) !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    backdrop-filter: blur(10px) !important;
   `;
   
-  // Dodaj style dla animacji
-  if (!document.querySelector('#update-banner-styles')) {
-    const style = document.createElement('style');
-    style.id = 'update-banner-styles';
-    style.textContent = `
-      @keyframes slideUp {
-        from { transform: translateY(100px); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
+  // Style dla wewnętrznego kontenera
+  const style = document.createElement('style');
+  style.textContent = `
+    #persistent-update-banner {
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+    .update-banner-inner {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 15px !important;
+      flex-wrap: wrap !important;
+      max-width: 600px !important;
+      margin: 0 auto !important;
+    }
+    .update-banner-icon {
+      font-size: 32px !important;
+      background: #ff3366 !important;
+      width: 50px !important;
+      height: 50px !important;
+      border-radius: 50% !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+    .update-banner-text {
+      flex: 1 !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+    .update-banner-text strong {
+      font-size: 16px !important;
+      color: #fff !important;
+      margin-bottom: 4px !important;
+    }
+    .update-banner-text small {
+      font-size: 12px !important;
+      color: #8888a0 !important;
+    }
+    .update-banner-btn {
+      background: #ff3366 !important;
+      color: white !important;
+      border: none !important;
+      padding: 12px 24px !important;
+      border-radius: 30px !important;
+      font-weight: bold !important;
+      font-size: 14px !important;
+      cursor: pointer !important;
+      transition: transform 0.2s, background 0.2s !important;
+      box-shadow: 0 2px 10px rgba(255,51,102,0.3) !important;
+    }
+    .update-banner-btn:active {
+      transform: scale(0.96) !important;
+      background: #e62e5c !important;
+    }
+    @media (max-width: 550px) {
+      .update-banner-inner {
+        flex-direction: column !important;
+        text-align: center !important;
       }
-      .update-banner-content {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        flex-wrap: wrap;
+      .update-banner-btn {
+        width: 100% !important;
       }
-      .update-icon {
-        font-size: 24px;
-      }
-      .update-text {
-        flex: 1;
-        font-weight: 600;
-        color: var(--text);
-      }
-      .update-btn {
-        background: var(--primary);
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: var(--radius-sm);
-        font-weight: 700;
-        cursor: pointer;
-        transition: transform 0.2s;
-      }
-      .update-btn:active {
-        transform: scale(0.97);
-      }
-      @media (max-width: 480px) {
-        .update-banner-content {
-          flex-direction: column;
-          text-align: center;
-        }
-        .update-btn {
-          width: 100%;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-  }
+    }
+  `;
+  document.head.appendChild(style);
   
   document.body.appendChild(banner);
   
-  // Obsługa kliknięcia przycisku
-  document.getElementById('update-now-btn').addEventListener('click', () => {
-    newWorker.postMessage({ type: 'SKIP_WAITING' });
-    window.location.reload();
+  // Obsługa kliknięcia - wymusza aktualizację
+  const updateBtn = document.getElementById('force-update-btn');
+  if (updateBtn) {
+    updateBtn.addEventListener('click', () => {
+      // Wyślij komendę do SW
+      newWorker.postMessage({ type: 'SKIP_WAITING' });
+      // Odśwież stronę
+      window.location.reload();
+    });
+  }
+  
+  // Dodaj też nasłuchiwanie na cały banner (na wszelki wypadek)
+  banner.addEventListener('click', (e) => {
+    if (e.target === banner || e.target.classList.contains('update-banner-inner')) {
+      // Nie robimy nic - tylko przycisk działa
+    }
   });
+  
+  console.log('Persistent update banner shown - will NOT disappear automatically');
 }
 
-// Reszta kodu app.js pozostaje BEZ ZMIAN (poniżej)
+// Reszta kodu app.js (reszta BEZ ZMIAN)
 const AppState = {
   currentScreen: 'screen-home',
   darkMode: true,
