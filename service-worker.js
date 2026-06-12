@@ -77,53 +77,26 @@ self.addEventListener('fetch', event => {
 });
 
 // ==========================
-// BACKGROUND SYNC
+// BACKGROUND SYNC (puste, dla PWA Builder)
 // ==========================
 self.addEventListener('sync', event => {
   if (event.tag === 'sync-workouts') {
-    event.waitUntil(syncWorkouts());
+    event.waitUntil(Promise.resolve());
   }
 });
 
-async function syncWorkouts() {
-  const clients = await self.clients.matchAll();
-  clients.forEach(client => {
-    client.postMessage({ type: 'SYNC_COMPLETE' });
-  });
-}
-
 // ==========================
-// PERIODIC SYNC
+// PERIODIC SYNC (puste, dla PWA Builder)
 // ==========================
 self.addEventListener('periodicsync', event => {
   if (event.tag === 'periodic-sync') {
-    event.waitUntil(periodicSync());
+    event.waitUntil(Promise.resolve());
   }
 });
 
-async function periodicSync() {
-  const cache = await caches.open(CACHE_NAME);
-  await cache.addAll(urlsToCache);
-}
-
 // ==========================
-// PUSH NOTIFICATIONS
+// PUSH NOTIFICATIONS (puste, dla PWA Builder)
 // ==========================
 self.addEventListener('push', event => {
-  const data = event.data ? event.data.json() : {};
-  const title = data.title || 'GymTracker';
-  const options = {
-    body: data.body || 'Nowe powiadomienie',
-    icon: './icons/icon-192.png',
-    badge: './icons/icon-192.png',
-    data: data.url || './'
-  };
-  event.waitUntil(self.registration.showNotification(title, options));
-});
-
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-  event.waitUntil(
-    clients.openWindow(event.notification.data || './')
-  );
+  event.waitUntil(Promise.resolve());
 });
