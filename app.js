@@ -5,7 +5,20 @@ if ('serviceWorker' in navigator) {
       const newWorker = registration.installing;
       newWorker.addEventListener('statechange', () => {
         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          window.location.reload();
+          // Pokaż komunikat o dostępnej aktualizacji
+          showToast('Dostępna jest nowa wersja! Kliknij, aby zaktualizować.', 'info');
+          // Znajdź ostatni toast i dodaj do niego event kliknięcia
+          setTimeout(() => {
+            const toasts = document.querySelectorAll('.toast');
+            const lastToast = toasts[toasts.length - 1];
+            if (lastToast) {
+              lastToast.style.cursor = 'pointer';
+              lastToast.onclick = () => {
+                newWorker.postMessage({ type: 'SKIP_WAITING' });
+                window.location.reload();
+              };
+            }
+          }, 100);
         }
       });
     });
