@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gymtracker-v1.0.0'; // ZMIEŃ wersję przy każdej aktualizacji!
+const CACHE_NAME = 'gymtracker-v1.1.0';
 const urlsToCache = [
   './',
   './index.html',
@@ -17,6 +17,9 @@ const urlsToCache = [
 
 const offlineFallbackPage = './index.html';
 
+// ==========================
+// INSTALL
+// ==========================
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
@@ -24,6 +27,9 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
+// ==========================
+// ACTIVATE
+// ==========================
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
@@ -38,13 +44,18 @@ self.addEventListener('activate', event => {
   );
 });
 
+// ==========================
+// OFFLINE SUPPORT (Has Logic)
+// ==========================
 self.addEventListener('fetch', event => {
   if (event.request.mode === 'navigate') {
     event.respondWith(
       (async () => {
         try {
           const preloadResp = await event.preloadResponse;
-          if (preloadResp) return preloadResp;
+          if (preloadResp) {
+            return preloadResp;
+          }
           const networkResp = await fetch(event.request);
           return networkResp;
         } catch (error) {
@@ -65,18 +76,54 @@ self.addEventListener('fetch', event => {
   }
 });
 
+// ==========================
+// BACKGROUND SYNC
+// ==========================
 self.addEventListener('sync', event => {
   if (event.tag === 'sync-workouts') {
-    event.waitUntil(Promise.resolve());
+    event.waitUntil(syncWorkouts());
   }
 });
 
+async function syncWorkouts() {
+  const clients = await self.clients.matchAll();
+  clients.forEach(client => {
+    client.postMessage({ type: 'SYNC_COMPLETE' });
+  });
+}
+
+// ==========================
+// PERIODIC SYNC
+// ==========================
 self.addEventListener('periodicsync', event => {
   if (event.tag === 'periodic-sync') {
-    event.waitUntil(Promise.resolve());
+    event.waitUntil(periodicSync());
   }
 });
 
+async function periodicSync() {
+  const cache = await caches.open(CACHE_NAME);
+  await cache.addAll(urlsToCache);
+}
+
+// ==========================
+// PUSH NOTIFICATIONS
+// ==========================
 self.addEventListener('push', event => {
-  event.waitUntil(Promise.resolve());
+  const data = event.data ? event.data.json() : {};
+  const title = data.title || 'GymTracker';
+  const options = {
+    body: data.body || 'Nowe powiadomienie',
+    icon: './icons/icon-192.png',
+    badge: './icons/icon-192.png',
+    data: data.url || './'
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(
+    clients.openWindow(event.notification.data || './')
+  );
 });
