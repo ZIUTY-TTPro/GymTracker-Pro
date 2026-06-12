@@ -24,5 +24,49 @@
       "sizes": "512x512",
       "type": "image/png"
     }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshots/mobile1.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Ekran główny"
+    },
+    {
+      "src": "screenshots/mobile2.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Biblioteka ćwiczeń"
+    },
+    {
+      "src": "screenshots/mobile3.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Definiowanie ćwiczenia"
+    },
+    {
+      "src": "screenshots/mobile4.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Definiowanie treningu"
+    },
+    {
+      "src": "screenshots/mobile5.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Aktywny trening"
+    },
+    {
+      "src": "screenshots/mobile6.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Przerwa między seriami"
+    }
   ]
 }
