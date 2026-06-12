@@ -1,25 +1,39 @@
 // ============================================
-// ZARZĄDZANIE WERSJĄ I AKTUALIZACJAMI
+// SPRAWDZANIE CZY DZIAŁAMY LOKALNIE (file://)
+// ============================================
+const isLocalFile = window.location.protocol === 'file:';
+
+if (isLocalFile) {
+  console.log('⚠️ Uruchomiono lokalnie (file://) - Service Worker wyłączony');
+  // Pokaż informację w konsoli, ale nie przerywaj działania aplikacji
+  const originalShowToast = showToast;
+  setTimeout(() => {
+    if (typeof showToast === 'function') {
+      showToast('Aplikacja działa w trybie offline (bez automatycznych aktualizacji)', 'info');
+    }
+  }, 1000);
+}
+
+// ============================================
+// ZARZĄDZANIE WERSJĄ I AKTUALIZACJAMI (TYLKO DLA HTTP/HTTPS)
 // ============================================
 
-const APP_VERSION = '1.1.0'; // Zwiększaj przy każdej zmianie
+const APP_VERSION = '1.1.0';
 let swRegistration = null;
 let updateBannerShown = false;
 
-// Rejestracja Service Worker
-if ('serviceWorker' in navigator) {
+// Rejestracja Service Worker TYLKO gdy nie jesteśmy na file://
+if ('serviceWorker' in navigator && !isLocalFile) {
   navigator.serviceWorker.register('./service-worker.js').then(registration => {
     swRegistration = registration;
     console.log('SW registered:', registration);
     updateSWStatus();
     
-    // Sprawdź czy już jest nowy worker czekający
     if (registration.waiting) {
       showUpdateBanner(registration.waiting);
       updateSWStatus();
     }
     
-    // Nasłuchuj na nowego workera
     registration.addEventListener('updatefound', () => {
       console.log('Update found!');
       const newWorker = registration.installing;
@@ -37,12 +51,10 @@ if ('serviceWorker' in navigator) {
     });
   });
   
-  // Nasłuchuj na komunikaty
   navigator.serviceWorker.addEventListener('message', (event) => {
     console.log('Message from SW:', event.data);
   });
   
-  // Sprawdź przy każdym załadowaniu
   navigator.serviceWorker.ready.then(registration => {
     swRegistration = registration;
     if (registration.waiting) {
@@ -50,6 +62,15 @@ if ('serviceWorker' in navigator) {
     }
     updateSWStatus();
   });
+} else if ('serviceWorker' in navigator && isLocalFile) {
+  console.log('SW nie został zarejestrowany - lokalny plik (file://)');
+  // Ustaw status w UI że SW nieaktywny
+  setTimeout(() => {
+    const swSpan = document.getElementById('sw-status');
+    if (swSpan) {
+      swSpan.innerHTML = '<span style="color: #ffb347;">⚠️ Niedostępny (tryb offline)</span>';
+    }
+  }, 500);
 }
 
 // Funkcja aktualizująca status SW w UI
@@ -62,6 +83,11 @@ function updateSWStatus(text) {
   }
   
   if (swSpan) {
+    if (isLocalFile) {
+      swSpan.innerHTML = '<span style="color: #ffb347;">⚠️ Niedostępny (tryb offline)</span>';
+      return;
+    }
+    
     if (text) {
       swSpan.textContent = text;
     } else if (swRegistration) {
@@ -78,8 +104,13 @@ function updateSWStatus(text) {
   }
 }
 
-// Ręczne sprawdzanie aktualizacji
+// Ręczne sprawdzanie aktualizacji (tylko gdy SW działa)
 async function checkForUpdates() {
+  if (isLocalFile) {
+    showToast('Aktualizacje są dostępne tylko w wersji online (GitHub Pages)', 'info');
+    return;
+  }
+  
   if (!swRegistration) {
     showToast('Service Worker nie jest zarejestrowany', 'error');
     return;
@@ -89,7 +120,6 @@ async function checkForUpdates() {
   updateSWStatus('Sprawdzanie...');
   
   try {
-    // Wymuś sprawdzenie aktualizacji
     await swRegistration.update();
     
     if (swRegistration.waiting) {
@@ -107,12 +137,11 @@ async function checkForUpdates() {
   }
 }
 
-// Funkcja pokazująca banner - NIGDY nie znika
+// Funkcja pokazująca banner (reszta bez zmian)
 function showUpdateBanner(worker) {
   if (updateBannerShown) return;
   updateBannerShown = true;
   
-  // Ukryj stary banner jeśli istnieje
   const oldBanner = document.getElementById('update-banner');
   if (oldBanner) oldBanner.remove();
   
@@ -160,12 +189,12 @@ function showUpdateBanner(worker) {
     showToast('Aktualizację można wykonać później w Ustawieniach', 'info');
   };
   
-  // Aktualizuj status w ustawieniach
   updateSWStatus('⚠️ Aktualizacja gotowa');
 }
 
 // ============================================
-// RESZTA ORYGINALNEGO KODU APP.JS
+// RESZTA TWOJEGO ORYGINALNEGO KODU APP.JS
+// (AppState, init, loadSettings, setupEventListeners itd.)
 // ============================================
 
 const AppState = {
