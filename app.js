@@ -1,146 +1,73 @@
-// Rejestracja Service Worker + aktualizacje
+// Rejestracja Service Worker - BEZ automatycznego przeładowania
+let updateBannerShown = false;
+
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./service-worker.js').then(registration => {
+    console.log('SW registered');
+    
+    // Sprawdź czy już jest nowy worker czekający
+    if (registration.waiting) {
+      showUpdateBanner(registration.waiting);
+    }
+    
+    // Nasłuchuj na nowego workera
     registration.addEventListener('updatefound', () => {
       const newWorker = registration.installing;
       newWorker.addEventListener('statechange', () => {
         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          // POKAŻ TRWAŁY KOMUNIKAT - NIGDY NIE ZNIKA
-          showPersistentUpdateBanner(newWorker);
+          showUpdateBanner(newWorker);
         }
       });
     });
   });
+  
+  // Sprawdź przy każdym załadowaniu
+  navigator.serviceWorker.ready.then(registration => {
+    if (registration.waiting) {
+      showUpdateBanner(registration.waiting);
+    }
+  });
 }
 
-// Funkcja pokazująca PRAWdziwie trwały banner (NIGDY nie znika)
-function showPersistentUpdateBanner(newWorker) {
-  // Usuń stary banner jeśli istnieje
-  const oldBanner = document.getElementById('persistent-update-banner');
-  if (oldBanner) oldBanner.remove();
+// Funkcja pokazująca banner - NIGDY nie znika automatycznie
+function showUpdateBanner(worker) {
+  if (updateBannerShown) return;
+  updateBannerShown = true;
   
-  // Stwórz banner
   const banner = document.createElement('div');
-  banner.id = 'persistent-update-banner';
+  banner.id = 'update-banner';
   banner.innerHTML = `
-    <div class="update-banner-inner">
-      <div class="update-banner-icon">🔄</div>
-      <div class="update-banner-text">
-        <strong>Nowa wersja dostępna!</strong>
-        <small>Kliknij przycisk, aby zaktualizować aplikację</small>
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 28px;">🔄</span>
+      <div style="flex: 1;">
+        <div style="font-weight: bold;">Nowa wersja dostępna!</div>
+        <div style="font-size: 12px; opacity: 0.7;">Kliknij przycisk, aby zaktualizować</div>
       </div>
-      <button id="force-update-btn" class="update-banner-btn">AKTUALIZUJ TERAZ</button>
+      <button id="do-update" style="background: #ff3366; color: white; border: none; padding: 10px 20px; border-radius: 30px; font-weight: bold; cursor: pointer;">AKTUALIZUJ</button>
     </div>
   `;
   
-  // Style - bardzo agresywne, żeby nikt nie mógł go ukryć
   banner.style.cssText = `
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%) !important;
-    border-top: 3px solid #ff3366 !important;
-    padding: 16px 20px !important;
-    z-index: 999999 !important;
-    box-shadow: 0 -5px 25px rgba(0,0,0,0.5) !important;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-    backdrop-filter: blur(10px) !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #1a1a2e;
+    border-top: 3px solid #ff3366;
+    padding: 15px 20px;
+    z-index: 999999;
+    box-shadow: 0 -5px 20px rgba(0,0,0,0.3);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   `;
-  
-  // Style dla wewnętrznego kontenera
-  const style = document.createElement('style');
-  style.textContent = `
-    #persistent-update-banner {
-      display: block !important;
-      visibility: visible !important;
-      opacity: 1 !important;
-    }
-    .update-banner-inner {
-      display: flex !important;
-      align-items: center !important;
-      justify-content: space-between !important;
-      gap: 15px !important;
-      flex-wrap: wrap !important;
-      max-width: 600px !important;
-      margin: 0 auto !important;
-    }
-    .update-banner-icon {
-      font-size: 32px !important;
-      background: #ff3366 !important;
-      width: 50px !important;
-      height: 50px !important;
-      border-radius: 50% !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-    }
-    .update-banner-text {
-      flex: 1 !important;
-      display: flex !important;
-      flex-direction: column !important;
-    }
-    .update-banner-text strong {
-      font-size: 16px !important;
-      color: #fff !important;
-      margin-bottom: 4px !important;
-    }
-    .update-banner-text small {
-      font-size: 12px !important;
-      color: #8888a0 !important;
-    }
-    .update-banner-btn {
-      background: #ff3366 !important;
-      color: white !important;
-      border: none !important;
-      padding: 12px 24px !important;
-      border-radius: 30px !important;
-      font-weight: bold !important;
-      font-size: 14px !important;
-      cursor: pointer !important;
-      transition: transform 0.2s, background 0.2s !important;
-      box-shadow: 0 2px 10px rgba(255,51,102,0.3) !important;
-    }
-    .update-banner-btn:active {
-      transform: scale(0.96) !important;
-      background: #e62e5c !important;
-    }
-    @media (max-width: 550px) {
-      .update-banner-inner {
-        flex-direction: column !important;
-        text-align: center !important;
-      }
-      .update-banner-btn {
-        width: 100% !important;
-      }
-    }
-  `;
-  document.head.appendChild(style);
   
   document.body.appendChild(banner);
   
-  // Obsługa kliknięcia - wymusza aktualizację
-  const updateBtn = document.getElementById('force-update-btn');
-  if (updateBtn) {
-    updateBtn.addEventListener('click', () => {
-      // Wyślij komendę do SW
-      newWorker.postMessage({ type: 'SKIP_WAITING' });
-      // Odśwież stronę
-      window.location.reload();
-    });
-  }
-  
-  // Dodaj też nasłuchiwanie na cały banner (na wszelki wypadek)
-  banner.addEventListener('click', (e) => {
-    if (e.target === banner || e.target.classList.contains('update-banner-inner')) {
-      // Nie robimy nic - tylko przycisk działa
-    }
-  });
-  
-  console.log('Persistent update banner shown - will NOT disappear automatically');
+  document.getElementById('do-update').onclick = () => {
+    worker.postMessage({ type: 'SKIP_WAITING' });
+    window.location.reload();
+  };
 }
 
-// Reszta kodu app.js (reszta BEZ ZMIAN)
 const AppState = {
   currentScreen: 'screen-home',
   darkMode: true,
@@ -211,7 +138,6 @@ function changeLanguage(lang) {
   saveSettings();
   applyTranslations(lang);
   
-  // Odśwież dynamiczne listy
   renderExercisesList();
   renderWorkoutsList();
   renderStatsExerciseSelect();
@@ -224,12 +150,10 @@ function changeLanguage(lang) {
 
 // --- EVENT LISTENERS ---
 function setupEventListeners() {
-  // Menu button - now shows dropdown or just opens settings
   document.getElementById('btn-menu')?.addEventListener('click', () => {
     showScreen('screen-settings', t('settings'));
   });
 
-  // Bottom nav
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const screenId = btn.dataset.screen;
@@ -244,23 +168,20 @@ function setupEventListeners() {
     });
   });
 
- // Back button
-document.getElementById('btn-back')?.addEventListener('click', () => {
+  document.getElementById('btn-back')?.addEventListener('click', () => {
     if (AppState.isWorkoutActive && activeWorkout) {
-        // Tylko wywołanie finishWorkout - on sam pokaże swój modal
-        finishWorkout();
-        return;
+      finishWorkout();
+      return;
     }
 
     if (AppState.currentScreen === 'screen-exercise-form' || AppState.currentScreen === 'screen-workout-form') {
-        showScreen('screen-home', 'GymTracker Pro');
-        return;
+      showScreen('screen-home', 'GymTracker Pro');
+      return;
     }
 
     showScreen('screen-home', 'GymTracker Pro');
-});
+  });
 
-  // New exercise
   document.getElementById('btn-new-exercise')?.addEventListener('click', () => {
     resetExerciseForm();
     showScreen('screen-exercise-form', t('define_exercise'));
@@ -270,7 +191,6 @@ document.getElementById('btn-back')?.addEventListener('click', () => {
     showScreen('screen-home', 'GymTracker Pro');
   });
 
-  // Exercise form submit
   document.getElementById('exercise-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -305,7 +225,6 @@ document.getElementById('btn-back')?.addEventListener('click', () => {
     }
   });
 
-  // New workout
   document.getElementById('btn-new-workout')?.addEventListener('click', async () => {
     resetWorkoutForm();
     await renderWorkoutExercisesSelect();
@@ -316,7 +235,6 @@ document.getElementById('btn-back')?.addEventListener('click', () => {
     showScreen('screen-home', 'GymTracker Pro');
   });
 
-  // Workout form submit
   document.getElementById('workout-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -359,26 +277,20 @@ document.getElementById('btn-back')?.addEventListener('click', () => {
     }
   });
 
-  // ACTIVE WORKOUT CONTROLS
-
-  // Pause button
   document.getElementById('btn-pause-workout')?.addEventListener('click', () => {
     pauseWorkout();
   });
 
-  // Resume button (on overlay)
   document.getElementById('btn-resume')?.addEventListener('click', () => {
     resumeWorkout();
   });
 
-  // Pause overlay click to resume
   document.getElementById('pause-overlay')?.addEventListener('click', (e) => {
     if (e.target.id === 'pause-overlay' || e.target.closest('.pause-content')) {
       resumeWorkout();
     }
   });
 
-  // Quick rest +/-
   document.getElementById('btn-rest-minus')?.addEventListener('click', () => {
     adjustQuickRest(-15);
   });
@@ -387,7 +299,6 @@ document.getElementById('btn-back')?.addEventListener('click', () => {
     adjustQuickRest(15);
   });
 
-  // Rounds +/-
   document.getElementById('btn-rounds-minus')?.addEventListener('click', () => {
     adjustTotalRounds(-1);
   });
@@ -396,22 +307,18 @@ document.getElementById('btn-back')?.addEventListener('click', () => {
     adjustTotalRounds(1);
   });
 
-  // Check all
   document.getElementById('check-all-exercises')?.addEventListener('change', (e) => {
     toggleCheckAll(e.target.checked);
   });
 
-  // Complete round button
   document.getElementById('btn-complete-round')?.addEventListener('click', () => {
     completeRound();
   });
 
-  // Finish workout
   document.getElementById('btn-finish-workout')?.addEventListener('click', () => {
     finishWorkout();
   });
 
-  // Stats tabs
   document.querySelectorAll('.stats-tabs .tab-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       document.querySelectorAll('.stats-tabs .tab-btn').forEach(b => b.classList.remove('active'));
@@ -425,7 +332,6 @@ document.getElementById('btn-back')?.addEventListener('click', () => {
     if (activeTab) await updateStatsChart(activeTab.dataset.tab);
   });
 
-  // Measurements form
   document.getElementById('measurements-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -460,7 +366,6 @@ document.getElementById('btn-back')?.addEventListener('click', () => {
     }
   });
 
-  // Settings
   document.getElementById('toggle-dark')?.addEventListener('change', (e) => {
     AppState.darkMode = e.target.checked;
     saveSettings();
@@ -471,7 +376,6 @@ document.getElementById('btn-back')?.addEventListener('click', () => {
     changeLanguage(e.target.value);
   });
 
-  // Export
   document.getElementById('btn-export')?.addEventListener('click', async () => {
     try {
       const data = await exportAllData();
@@ -489,7 +393,6 @@ document.getElementById('btn-back')?.addEventListener('click', () => {
     }
   });
 
-  // Import
   document.getElementById('btn-import')?.addEventListener('click', () => {
     document.getElementById('import-file')?.click();
   });
@@ -516,7 +419,6 @@ document.getElementById('btn-back')?.addEventListener('click', () => {
     e.target.value = '';
   });
 
-  // Visibility change
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume();
@@ -524,7 +426,6 @@ document.getElementById('btn-back')?.addEventListener('click', () => {
   });
 }
 
-// --- STATS CHART UPDATE ---
 async function updateStatsChart(tabType) {
   const exerciseSelect = document.getElementById('stats-exercise-select');
   const exerciseId = exerciseSelect?.value;
@@ -550,7 +451,6 @@ async function updateStatsChart(tabType) {
   }
 }
 
-// --- OVERRIDE showScreen ---
 const originalShowScreen = showScreen;
 showScreen = function(screenId, title) {
   AppState.currentScreen = screenId;
@@ -558,9 +458,6 @@ showScreen = function(screenId, title) {
   originalShowScreen(screenId, title);
 };
 
-// ==========================
-// PWA INSTALL PROMPT
-// ==========================
 let deferredPrompt;
 
 window.addEventListener('beforeinstallprompt', (e) => {
