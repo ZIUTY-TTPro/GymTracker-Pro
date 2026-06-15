@@ -12,36 +12,34 @@ function initDB() {
       db = request.result;
       resolve(db);
     };
-
     request.onupgradeneeded = (event) => {
       const database = event.target.result;
-
       if (!database.objectStoreNames.contains('exercises')) {
         const exStore = database.createObjectStore('exercises', { keyPath: 'id', autoIncrement: true });
         exStore.createIndex('name', 'name', { unique: false });
         exStore.createIndex('muscle', 'muscle', { unique: false });
       }
-
       if (!database.objectStoreNames.contains('workouts')) {
         const woStore = database.createObjectStore('workouts', { keyPath: 'id', autoIncrement: true });
         woStore.createIndex('name', 'name', { unique: false });
       }
-
       if (!database.objectStoreNames.contains('sessions')) {
         const sessStore = database.createObjectStore('sessions', { keyPath: 'id', autoIncrement: true });
         sessStore.createIndex('date', 'date', { unique: false });
         sessStore.createIndex('workoutId', 'workoutId', { unique: false });
       }
-
       if (!database.objectStoreNames.contains('measurements')) {
         const msStore = database.createObjectStore('measurements', { keyPath: 'id', autoIncrement: true });
         msStore.createIndex('date', 'date', { unique: false });
       }
     };
+    request.onblocked = () => {
+      console.warn('IndexedDB blocked - close other tabs');
+      reject(new Error('Database blocked - close other tabs'));
+    };
   });
 }
 
-// --- GENERIC CRUD ---
 function addItem(storeName, data) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction([storeName], 'readwrite');
@@ -92,7 +90,6 @@ function deleteItem(storeName, id) {
   });
 }
 
-// --- EXERCISES ---
 function addExercise(exercise) {
   return addItem('exercises', { ...exercise, createdAt: new Date().toISOString() });
 }
@@ -101,7 +98,6 @@ function getAllExercises() { return getAllItems('exercises'); }
 function updateExercise(exercise) { return updateItem('exercises', exercise); }
 function deleteExercise(id) { return deleteItem('exercises', id); }
 
-// --- WORKOUTS ---
 function addWorkout(workout) {
   return addItem('workouts', { ...workout, createdAt: new Date().toISOString() });
 }
@@ -110,7 +106,6 @@ function getAllWorkouts() { return getAllItems('workouts'); }
 function updateWorkout(workout) { return updateItem('workouts', workout); }
 function deleteWorkout(id) { return deleteItem('workouts', id); }
 
-// --- SESSIONS ---
 function addSession(session) {
   return addItem('sessions', {
     ...session,
@@ -122,7 +117,6 @@ function getSession(id) { return getItem('sessions', id); }
 function getAllSessions() { return getAllItems('sessions'); }
 function deleteSession(id) { return deleteItem('sessions', id); }
 
-// --- MEASUREMENTS ---
 function addMeasurement(measurement) {
   return addItem('measurements', { ...measurement, createdAt: new Date().toISOString() });
 }
@@ -131,7 +125,6 @@ function getAllMeasurements() { return getAllItems('measurements'); }
 function updateMeasurement(m) { return updateItem('measurements', m); }
 function deleteMeasurement(id) { return deleteItem('measurements', id); }
 
-// --- EXPORT / IMPORT ---
 async function exportAllData() {
   const data = {
     exercises: await getAllExercises(),
@@ -147,7 +140,6 @@ async function exportAllData() {
 async function importAllData(jsonString) {
   const data = JSON.parse(jsonString);
   const stores = ['exercises', 'workouts', 'sessions', 'measurements'];
-
   for (const storeName of stores) {
     const tx = db.transaction([storeName], 'readwrite');
     const store = tx.objectStore(storeName);
@@ -157,18 +149,15 @@ async function importAllData(jsonString) {
       req.onerror = () => reject(req.error);
     });
   }
-
   if (data.exercises) for (const item of data.exercises) await addItem('exercises', item);
   if (data.workouts) for (const item of data.workouts) await addItem('workouts', item);
   if (data.sessions) for (const item of data.sessions) await addItem('sessions', item);
   if (data.measurements) for (const item of data.measurements) await addItem('measurements', item);
 }
 
-// --- STATS HELPERS ---
 async function getExerciseStats(exerciseId) {
   const sessions = await getAllSessions();
   const stats = [];
-
   for (const session of sessions) {
     if (!session.exercises) continue;
     for (const ex of session.exercises) {
@@ -195,7 +184,6 @@ async function getExerciseStats(exerciseId) {
 async function getVolumeStats() {
   const sessions = await getAllSessions();
   const volumeByDate = {};
-
   for (const session of sessions) {
     if (!session.exercises) continue;
     let sessionVolume = 0;
@@ -209,7 +197,6 @@ async function getVolumeStats() {
     const dateKey = session.date.split('T')[0];
     volumeByDate[dateKey] = (volumeByDate[dateKey] || 0) + sessionVolume;
   }
-
   return Object.entries(volumeByDate)
     .map(([date, volume]) => ({ date, volume }))
     .sort((a, b) => new Date(a.date) - new Date(b.date));
