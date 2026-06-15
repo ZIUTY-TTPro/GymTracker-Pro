@@ -36,7 +36,7 @@ const translations = {
     save_workout: "Zapisz Trening",
     skip: "Pomiń ćwiczenie",
     finish_workout: "Zakończ trening",
-    finish_round: "Zakończ Runde",
+    finish_round: "Zakończ Rundę",
     export_data: "Eksportuj dane (JSON)",
     import_data: "Importuj dane (JSON)",
     save_measurement: "Zapisz Pomiar",
@@ -48,7 +48,7 @@ const translations = {
     reps: "Powtórzenia",
     rest_time: "Przerwa między seriami (sek)",
     exercise_placeholder: "np. Wyciskanie sztangi",
-    global_sets: "Liczba serii (dla wszystkich cwiczeń)",
+    global_sets: "Liczba serii (dla wszystkich ćwiczeń)",
     chest: "Klatka piersiowa",
     back: "Plecy",
     shoulders: "Barki",
@@ -75,8 +75,8 @@ const translations = {
     all_sets_done: "Wszystkie serie wykonane",
     skipped: "Pominięto",
     statistics: "Statystyki",
-    weight_progress: "Postęp cieżaru",
-    volume: "Objetość",
+    weight_progress: "Postęp ciężaru",
+    volume: "Objętość",
     body_measurements: "Pomiary Ciała",
     select_exercise: "Wybierz ćwiczenie",
     no_data: "Brak danych",
@@ -93,8 +93,9 @@ const translations = {
     waist: "Talia (cm)",
     weight_kg: "Waga (kg)",
     measurements_history: "Historia pomiarów",
-    appearance: "Wyglad",
+    appearance: "Wygląd",
     dark_mode: "Tryb ciemny",
+    light_mode: "Tryb jasny",
     language: "Język",
     data: "Dane",
     polish: "Polski",
@@ -102,8 +103,8 @@ const translations = {
     saved: "Zapisano!",
     deleted: "Usunięto!",
     updated: "Zaktualizowano!",
-    error: "Bląd!",
-    confirm_delete: "Czy na pewno chcesz usunać?",
+    error: "Błąd!",
+    confirm_delete: "Czy na pewno chcesz usunąć?",
     import_success: "Dane zaimportowane pomyślnie",
     import_error: "Błąd importu danych",
     export_success: "Dane wyeksportowane",
@@ -143,14 +144,40 @@ const translations = {
     complete_workout: "ZAKOŃCZ TRENING",
     done_count_total: "{0}/{1} Zrobione",
     done_count_finish_workout: "{0}/{1} zrobione - ZAKOŃCZ TRENING",
-done_count_finish_round: "{0}/{1} zrobione - ZAKOŃCZ RUNDĘ",
+    done_count_finish_round: "{0}/{1} zrobione - ZAKOŃCZ RUNDĘ",
     database_error: "Błąd bazy danych",
-    light_mode: "Tryb jasny",
     stats_info: "Wybierz ćwiczenie aby zobaczyć jak zmieniał się Twój ciężar w czasie. Wykres pokazuje największy ciężar z każdego treningu dla danego ćwiczenia.",
-	app_version: "Wersja aplikacji",
-check_updates: "Sprawdź aktualizacje"
+    app_version: "Wersja aplikacji",
+    check_updates: "Sprawdź aktualizacje",
+    no_data_add_exercise: "Brak danych - dodaj ćwiczenie",
+    perform_workout_to_see_stats: "Wykonaj trening, aby zobaczyć statystyki",
+    version: "Wersja",
+    service_worker: "Service Worker",
+    sw_unavailable_offline: "Niedostępny (tryb offline)",
+    sw_update_ready: "⚠️ Aktualizacja gotowa",
+    sw_active: "✅ Aktywny",
+    sw_checking_updates: "Sprawdzanie aktualizacji...",
+    sw_up_to_date: "✅ Aktualny",
+    sw_error: "❌ Błąd",
+    sw_registration: "Rejestracja...",
+    sw_none: "Brak Service Worker",
+    sw_state: "Stan: {0}",
+    sw_downloading: "Pobieranie aktualizacji...",
+    update_available: "Nowa wersja dostępna!",
+    version_x_to_newer: "Wersja {0} → nowsza",
+    update_now: "AKTUALIZUJ TERAZ",
+    later: "Później",
+    install_app: "Zainstaluj aplikację",
+    app_offline_mode: "Aplikacja działa w trybie offline (bez automatycznych aktualizacji)",
+    updates_only_online: "Aktualizacje są dostępne tylko w wersji online",
+    sw_not_registered: "Service Worker nie jest zarejestrowany",
+    update_found: "Znaleziono aktualizację!",
+    no_updates: "Brak nowych aktualizacji",
+    update_check_error: "Błąd sprawdzania aktualizacji",
+    some_exercises_missing: "Niektóre ćwiczenia nie istnieją w bazie",
+    updating: "Aktualizacja...",
+    update_can_be_done_later: "Aktualizację można wykonać później w Ustawieniach"
   },
-
   en: {
     my_workouts: "My Workouts",
     exercise_library: "Exercise Library",
@@ -227,9 +254,10 @@ check_updates: "Sprawdź aktualizacje"
     measurements_history: "Measurements history",
     appearance: "Appearance",
     dark_mode: "Dark mode",
+    light_mode: "Light mode",
     language: "Language",
     data: "Data",
-    polish: "Polski",
+    polish: "Polish",
     english: "English",
     saved: "Saved!",
     deleted: "Deleted!",
@@ -277,24 +305,48 @@ check_updates: "Sprawdź aktualizacje"
     done_count_finish_workout: "{0}/{1} done - FINISH WORKOUT",
     done_count_finish_round: "{0}/{1} done - COMPLETE ROUND",
     database_error: "Database error",
-    light_mode: "Light mode",
     stats_info: "Select an exercise to see how your weight changed over time. The chart shows the heaviest weight from each workout for the selected exercise.",
-	app_version: "App version",
-check_updates: "Check for updates"
+    app_version: "App version",
+    check_updates: "Check for updates",
+    no_data_add_exercise: "No data - add exercise",
+    perform_workout_to_see_stats: "Perform a workout to see statistics",
+    version: "Version",
+    service_worker: "Service Worker",
+    sw_unavailable_offline: "Unavailable (offline mode)",
+    sw_update_ready: "⚠️ Update ready",
+    sw_active: "✅ Active",
+    sw_checking_updates: "Checking for updates...",
+    sw_up_to_date: "✅ Up to date",
+    sw_error: "❌ Error",
+    sw_registration: "Registering...",
+    sw_none: "No Service Worker",
+    sw_state: "Status: {0}",
+    sw_downloading: "Downloading update...",
+    update_available: "New version available!",
+    version_x_to_newer: "Version {0} → newer",
+    update_now: "UPDATE NOW",
+    later: "Later",
+    install_app: "Install app",
+    app_offline_mode: "App is running in offline mode (no automatic updates)",
+    updates_only_online: "Updates are only available in online mode",
+    sw_not_registered: "Service Worker is not registered",
+    update_found: "Update found!",
+    no_updates: "No new updates",
+    update_check_error: "Update check error",
+    some_exercises_missing: "Some exercises do not exist in the database",
+    updating: "Updating...",
+    update_can_be_done_later: "Update can be done later in Settings"
   }
 };
 
 function t(key, lang = null) {
   const currentLang = lang || localStorage.getItem('gym-lang') || 'pl';
   let text = translations[currentLang]?.[key] || translations['pl'][key] || key;
-
-  // Simple string formatting for {0}, {1}, etc.
   if (arguments.length > 2) {
     for (let i = 2; i < arguments.length; i++) {
       text = text.replace(new RegExp('\\{' + (i - 2) + '\\}', 'g'), arguments[i]);
     }
   }
-
   return text;
 }
 
@@ -309,15 +361,12 @@ function applyTranslations(lang = null) {
       el.textContent = prefix + translations[currentLang][key];
     }
   });
-
-  // Translate placeholders
   document.querySelectorAll('[data-placeholder-key]').forEach(el => {
     const key = el.getAttribute('data-placeholder-key');
     if (translations[currentLang]?.[key]) {
       el.placeholder = translations[currentLang][key];
     }
   });
-
   const muscleSelect = document.getElementById('ex-muscle');
   if (muscleSelect) {
     Array.from(muscleSelect.options).forEach(opt => {
@@ -327,7 +376,6 @@ function applyTranslations(lang = null) {
       }
     });
   }
-
   const langSelect = document.getElementById('lang-select');
   if (langSelect) {
     Array.from(langSelect.options).forEach(opt => {
