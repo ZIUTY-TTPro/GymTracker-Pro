@@ -2,27 +2,23 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#1a1a2e">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>GymTracker Pro</title>
     <link rel="manifest" href="./manifest.json">
-	<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-	<link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="stylesheet" href="style.css">
-	<!-- <base href="./"> -->
 </head>
 <body>
     <div id="app">
-        <!-- HEADER -->
         <header id="header">
             <button id="btn-back" class="icon-btn hidden">&#8592;</button>
             <h1 id="page-title">GymTracker Pro</h1>
-            <!-- <button id="btn-menu" class="icon-btn">&#9776;</button> -->
         </header>
 
-        <!-- MAIN CONTENT -->
         <main id="main">
             <!-- SCREEN: HOME -->
             <section id="screen-home" class="screen active">
@@ -122,7 +118,6 @@
 
             <!-- SCREEN: AKTYWNY TRENING -->
             <section id="screen-active-workout" class="screen">
-                <!-- PAUSE OVERLAY -->
                 <div id="pause-overlay" class="pause-overlay hidden">
                     <div class="pause-content">
                         <div class="pause-icon">&#9208;</div>
@@ -144,7 +139,6 @@
                     </div>
                 </div>
 
-                <!-- RUNDA - duży numer + przyciski -->
                 <div class="round-banner">
                     <div class="round-info">
                         <span class="round-label" data-key="round">Runda</span>
@@ -158,7 +152,6 @@
                     </div>
                 </div>
 
-                <!-- PRZERWA -->
                 <div class="edit-row">
                     <span class="edit-label" data-key="rest_label">Przerwa:</span>
                     <div class="number-input small">
@@ -169,7 +162,6 @@
                     </div>
                 </div>
 
-                <!-- CHECK ALL -->
                 <div class="check-all-row">
                     <label class="check-all-label">
                         <input type="checkbox" id="check-all-exercises">
@@ -180,12 +172,7 @@
                 <div class="superset-table-container">
                     <table id="superset-table" class="superset-table">
                         <thead>
-                            <tr>
-                                <th data-key="exercise">Ćwiczenie</th>
-                                <th data-key="weight">Waga</th>
-                                <th data-key="reps">Powtórzenia</th>
-                                <th data-key="done">Zrobione</th>
-                            </tr>
+                            <tr><th data-key="exercise">Ćwiczenie</th><th data-key="weight">Waga</th><th data-key="reps">Powtórzenia</th><th data-key="done">Zrobione</th></tr>
                         </thead>
                         <tbody id="superset-tbody"></tbody>
                     </table>
@@ -282,31 +269,19 @@
                     <h3 data-key="appearance">Wyglad</h3>
                     <div class="setting-row">
                         <label data-key="dark_mode">Tryb ciemny</label>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggle-dark" checked>
-                            <span class="toggle-slider"></span>
-                        </label>
+                        <label class="toggle"><input type="checkbox" id="toggle-dark" checked><span class="toggle-slider"></span></label>
                     </div>
                     <div class="setting-row">
                         <label data-key="language">Jezyk</label>
-                        <select id="lang-select">
-                            <option value="pl">Polski</option>
-                            <option value="en">English</option>
-                        </select>
+                        <select id="lang-select"><option value="pl">Polski</option><option value="en">English</option></select>
                     </div>
                 </div>
-				<div class="settings-group">
-    <h3 data-key="app_version">Wersja aplikacji</h3>
-    <div class="setting-row">
-        <label>Wersja</label>
-        <span id="app-version" style="font-weight: bold; color: var(--primary);">v1.1.0</span>
-    </div>
-    <div class="setting-row">
-        <label>Service Worker</label>
-        <span id="sw-status" style="font-size: 12px;">Sprawdzanie...</span>
-    </div>
-    <button id="check-updates-btn" class="btn-secondary btn-full mt-1" data-key="check_updates">Sprawdź aktualizacje</button>
-</div>
+                <div class="settings-group">
+                    <h3 data-key="app_version">Wersja aplikacji</h3>
+                    <div class="setting-row"><label data-key="version">Wersja</label><span id="app-version" style="font-weight: bold; color: var(--primary);">v1.1.0</span></div>
+                    <div class="setting-row"><label data-key="service_worker">Service Worker</label><span id="sw-status" style="font-size: 12px;">Sprawdzanie...</span></div>
+                    <button id="check-updates-btn" class="btn-secondary btn-full mt-1" data-key="check_updates">Sprawdź aktualizacje</button>
+                </div>
                 <div class="settings-group">
                     <h3 data-key="data">Dane</h3>
                     <button id="btn-export" class="btn-secondary btn-full" data-key="export_data">Eksportuj dane (JSON)</button>
@@ -316,35 +291,17 @@
             </section>
         </main>
 
-        <!-- BOTTOM NAV -->
         <nav id="bottom-nav" class="hidden">
-            <button class="nav-btn active" data-screen="screen-home">
-                <span class="nav-icon">&#127968;</span>
-                <span class="nav-label" data-key="home">Start</span>
-            </button>
-            <button class="nav-btn" data-screen="screen-stats">
-                <span class="nav-icon">&#128202;</span>
-                <span class="nav-label" data-key="stats">Statystyki</span>
-            </button>
-            <button class="nav-btn" data-screen="screen-measurements">
-                <span class="nav-icon">&#128207;</span>
-                <span class="nav-label" data-key="measurements">Pomiary</span>
-            </button>
-            <button class="nav-btn" data-screen="screen-history">
-                <span class="nav-icon">&#128203;</span>
-                <span class="nav-label" data-key="history">Historia</span>
-            </button>
-            <button class="nav-btn" data-screen="screen-settings">
-                <span class="nav-icon">&#9881;</span>
-                <span class="nav-label" data-key="settings">Ustawienia</span>
-            </button>
+            <button class="nav-btn active" data-screen="screen-home"><span class="nav-icon">&#127968;</span><span class="nav-label" data-key="home">Start</span></button>
+            <button class="nav-btn" data-screen="screen-stats"><span class="nav-icon">&#128202;</span><span class="nav-label" data-key="stats">Statystyki</span></button>
+            <button class="nav-btn" data-screen="screen-measurements"><span class="nav-icon">&#128207;</span><span class="nav-label" data-key="measurements">Pomiary</span></button>
+            <button class="nav-btn" data-screen="screen-history"><span class="nav-icon">&#128203;</span><span class="nav-label" data-key="history">Historia</span></button>
+            <button class="nav-btn" data-screen="screen-settings"><span class="nav-icon">&#9881;</span><span class="nav-label" data-key="settings">Ustawienia</span></button>
         </nav>
 
-        <!-- TOAST NOTIFICATIONS -->
         <div id="toast-container"></div>
     </div>
 
-    <!-- MODAL KONFIRMACJI -->
     <div id="confirm-modal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-icon">🏋️</div>
@@ -356,6 +313,24 @@
         </div>
     </div>
 
+    <!-- FALLBACK dla adjustValue (przed wszystkimi skryptami) -->
+    <script>
+        window.adjustValue = window.adjustValue || function(id, delta) {
+            var input = document.getElementById(id);
+            if (!input) return;
+            var step = parseFloat(input.step) || 1;
+            var min = parseFloat(input.min) || 0;
+            var max = parseFloat(input.max) || Infinity;
+            var val = parseFloat(input.value) || 0;
+            val += delta;
+            if (val < min) val = min;
+            if (val > max) val = max;
+            var precision = step.toString().split('.')[1]?.length || 0;
+            input.value = val.toFixed(precision);
+        };
+        window.adjustActiveValue = window.adjustValue;
+    </script>
+
     <script src="chart.umd.min.js"></script>
     <script src="db.js"></script>
     <script src="translations.js"></script>
@@ -363,5 +338,5 @@
     <script src="charts.js"></script>
     <script src="ui.js"></script>
     <script src="app.js"></script>
- </body>
+</body>
 </html>
