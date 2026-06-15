@@ -1,28 +1,25 @@
 // ============================================
-// SPRAWDZANIE CZY DZIAŁAMY LOKALNIE (file://)
+// SPRAWDZANIE CZY DZIAŁAMY LOKALNIE
 // ============================================
 const isLocalFile = window.location.protocol === 'file:';
 
 if (isLocalFile) {
   console.log('⚠️ Uruchomiono lokalnie (file://) - Service Worker wyłączony');
-  // Pokaż informację w konsoli, ale nie przerywaj działania aplikacji
-  const originalShowToast = showToast;
   setTimeout(() => {
     if (typeof showToast === 'function') {
-      showToast('Aplikacja działa w trybie offline (bez automatycznych aktualizacji)', 'info');
+      showToast(t('app_offline_mode'), 'info');
     }
   }, 1000);
 }
 
 // ============================================
-// ZARZĄDZANIE WERSJĄ I AKTUALIZACJAMI (TYLKO DLA HTTP/HTTPS)
+// ZARZĄDZANIE WERSJĄ I AKTUALIZACJAMI
 // ============================================
 
 const APP_VERSION = '1.1.0';
 let swRegistration = null;
 let updateBannerShown = false;
 
-// Rejestracja Service Worker TYLKO gdy nie jesteśmy na file://
 if ('serviceWorker' in navigator && !isLocalFile) {
   navigator.serviceWorker.register('./service-worker.js').then(registration => {
     swRegistration = registration;
@@ -37,15 +34,15 @@ if ('serviceWorker' in navigator && !isLocalFile) {
     registration.addEventListener('updatefound', () => {
       console.log('Update found!');
       const newWorker = registration.installing;
-      updateSWStatus('Pobieranie aktualizacji...');
+      updateSWStatus(t('sw_downloading'));
       
       newWorker.addEventListener('statechange', () => {
         console.log('Worker state:', newWorker.state);
-        updateSWStatus(`Stan: ${newWorker.state}`);
+        updateSWStatus(t('sw_state', null, newWorker.state));
         
         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
           showUpdateBanner(newWorker);
-          updateSWStatus('Aktualizacja gotowa!');
+          updateSWStatus(t('sw_update_ready'));
         }
       });
     });
@@ -64,16 +61,14 @@ if ('serviceWorker' in navigator && !isLocalFile) {
   });
 } else if ('serviceWorker' in navigator && isLocalFile) {
   console.log('SW nie został zarejestrowany - lokalny plik (file://)');
-  // Ustaw status w UI że SW nieaktywny
   setTimeout(() => {
     const swSpan = document.getElementById('sw-status');
     if (swSpan) {
-      swSpan.innerHTML = '<span style="color: #ffb347;">⚠️ Niedostępny (tryb offline)</span>';
+      swSpan.innerHTML = `<span style="color: #ffb347;">⚠️ ${t('sw_unavailable_offline')}</span>`;
     }
   }, 500);
 }
 
-// Funkcja aktualizująca status SW w UI
 function updateSWStatus(text) {
   const swSpan = document.getElementById('sw-status');
   const versionSpan = document.getElementById('app-version');
@@ -84,7 +79,7 @@ function updateSWStatus(text) {
   
   if (swSpan) {
     if (isLocalFile) {
-      swSpan.innerHTML = '<span style="color: #ffb347;">⚠️ Niedostępny (tryb offline)</span>';
+      swSpan.innerHTML = `<span style="color: #ffb347;">⚠️ ${t('sw_unavailable_offline')}</span>`;
       return;
     }
     
@@ -92,52 +87,50 @@ function updateSWStatus(text) {
       swSpan.textContent = text;
     } else if (swRegistration) {
       if (swRegistration.waiting) {
-        swSpan.innerHTML = '<span style="color: #ffb347;">⚠️ Aktualizacja gotowa</span>';
+        swSpan.innerHTML = `<span style="color: #ffb347;">⚠️ ${t('sw_update_ready')}</span>`;
       } else if (swRegistration.active) {
-        swSpan.innerHTML = '<span style="color: #00d4aa;">✅ Aktywny</span>';
+        swSpan.innerHTML = `<span style="color: #00d4aa;">✅ ${t('sw_active')}</span>`;
       } else {
-        swSpan.textContent = 'Rejestracja...';
+        swSpan.textContent = t('sw_registration');
       }
     } else {
-      swSpan.textContent = 'Brak Service Worker';
+      swSpan.textContent = t('sw_none');
     }
   }
 }
 
-// Ręczne sprawdzanie aktualizacji (tylko gdy SW działa)
 async function checkForUpdates() {
   if (isLocalFile) {
-    showToast('Aktualizacje są dostępne tylko w wersji online (GitHub Pages)', 'info');
+    showToast(t('updates_only_online'), 'info');
     return;
   }
   
   if (!swRegistration) {
-    showToast('Service Worker nie jest zarejestrowany', 'error');
+    showToast(t('sw_not_registered'), 'error');
     return;
   }
   
-  showToast('Sprawdzanie aktualizacji...', 'info');
-  updateSWStatus('Sprawdzanie...');
+  showToast(t('sw_checking_updates'), 'info');
+  updateSWStatus(t('sw_checking_updates'));
   
   try {
     await swRegistration.update();
     
     if (swRegistration.waiting) {
       showUpdateBanner(swRegistration.waiting);
-      showToast('Znaleziono aktualizację!', 'success');
-      updateSWStatus('Aktualizacja gotowa!');
+      showToast(t('update_found'), 'success');
+      updateSWStatus(t('sw_update_ready'));
     } else {
-      showToast('Brak nowych aktualizacji', 'info');
-      updateSWStatus('✅ Aktualny');
+      showToast(t('no_updates'), 'info');
+      updateSWStatus(t('sw_up_to_date'));
     }
   } catch (err) {
     console.error('Update check failed:', err);
-    showToast('Błąd sprawdzania aktualizacji', 'error');
-    updateSWStatus('❌ Błąd');
+    showToast(t('update_check_error'), 'error');
+    updateSWStatus(t('sw_error'));
   }
 }
 
-// Funkcja pokazująca banner (reszta bez zmian)
 function showUpdateBanner(worker) {
   if (updateBannerShown) return;
   updateBannerShown = true;
@@ -151,11 +144,11 @@ function showUpdateBanner(worker) {
     <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
       <span style="font-size: 28px;">🔄</span>
       <div style="flex: 1;">
-        <div style="font-weight: bold;">Nowa wersja dostępna!</div>
-        <div style="font-size: 12px; opacity: 0.7;">Wersja ${APP_VERSION} → nowsza</div>
+        <div style="font-weight: bold;">${t('update_available')}</div>
+        <div style="font-size: 12px; opacity: 0.7;">${t('version_x_to_newer', null, APP_VERSION)}</div>
       </div>
-      <button id="do-update" style="background: #ff3366; color: white; border: none; padding: 10px 20px; border-radius: 30px; font-weight: bold; cursor: pointer;">AKTUALIZUJ TERAZ</button>
-      <button id="dismiss-update" style="background: none; color: #888; border: 1px solid #888; padding: 10px 20px; border-radius: 30px; cursor: pointer;">Później</button>
+      <button id="do-update" style="background: #ff3366; color: white; border: none; padding: 10px 20px; border-radius: 30px; font-weight: bold; cursor: pointer;">${t('update_now')}</button>
+      <button id="dismiss-update" style="background: none; color: #888; border: 1px solid #888; padding: 10px 20px; border-radius: 30px; cursor: pointer;">${t('later')}</button>
     </div>
   `;
   
@@ -176,7 +169,7 @@ function showUpdateBanner(worker) {
   document.body.appendChild(banner);
   
   document.getElementById('do-update').onclick = () => {
-    showToast('Aktualizacja...', 'info');
+    showToast(t('updating'), 'info');
     worker.postMessage({ type: 'SKIP_WAITING' });
     setTimeout(() => {
       window.location.reload();
@@ -186,15 +179,14 @@ function showUpdateBanner(worker) {
   document.getElementById('dismiss-update').onclick = () => {
     banner.remove();
     updateBannerShown = false;
-    showToast('Aktualizację można wykonać później w Ustawieniach', 'info');
+    showToast(t('update_can_be_done_later'), 'info');
   };
   
-  updateSWStatus('⚠️ Aktualizacja gotowa');
+  updateSWStatus(t('sw_update_ready'));
 }
 
 // ============================================
-// RESZTA TWOJEGO ORYGINALNEGO KODU APP.JS
-// (AppState, init, loadSettings, setupEventListeners itd.)
+// APP STATE
 // ============================================
 
 const AppState = {
@@ -204,7 +196,49 @@ const AppState = {
   isWorkoutActive: false
 };
 
-// --- INIT ---
+const originalShowScreen = window.showScreen || function(screenId, title) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const screen = document.getElementById(screenId);
+  if (screen) screen.classList.add('active');
+  const pageTitle = document.getElementById('page-title');
+  if (pageTitle && title) pageTitle.textContent = title;
+};
+
+window.showScreen = function(screenId, title) {
+  AppState.currentScreen = screenId;
+  AppState.isWorkoutActive = (screenId === 'screen-active-workout');
+  originalShowScreen(screenId, title);
+  
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.screen === screenId);
+  });
+  
+  const bottomNav = document.getElementById('bottom-nav');
+  const hideNavScreens = ['screen-exercise-form', 'screen-workout-form', 'screen-active-workout'];
+  if (bottomNav) bottomNav.classList.toggle('hidden', hideNavScreens.includes(screenId));
+  
+  const backBtn = document.getElementById('btn-back');
+  if (backBtn) {
+    backBtn.classList.toggle('hidden', !hideNavScreens.includes(screenId) && screenId !== 'screen-home');
+  }
+  
+  const main = document.getElementById('main');
+  if (main) main.scrollTop = 0;
+
+  if (screenId === 'screen-stats') {
+    renderStatsExerciseSelect().then(() => {
+      const activeTab = document.querySelector('.stats-tabs .tab-btn.active');
+      if (activeTab && typeof updateStatsChart === 'function') {
+        updateStatsChart(activeTab.dataset.tab);
+      }
+    });
+  }
+};
+
+// ============================================
+// INIT
+// ============================================
+
 document.addEventListener('DOMContentLoaded', async () => {
   loadSettings();
 
@@ -226,21 +260,62 @@ document.addEventListener('DOMContentLoaded', async () => {
   await renderStatsExerciseSelect();
   await renderWorkoutExercisesSelect();
 
+  const statsSelect = document.getElementById('stats-exercise-select');
+  if (statsSelect && statsSelect.options.length > 1) {
+    statsSelect.value = statsSelect.options[1].value;
+    await updateStatsChart('weight-chart');
+  }
+
   setupEventListeners();
   showScreen('screen-home', 'GymTracker Pro');
 
   const msDate = document.getElementById('ms-date');
   if (msDate) msDate.valueAsDate = new Date();
+
+  // PRZYWROCENIE AUTOSAVE (poprawione)
+  const saved = localStorage.getItem('gym-autosave');
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      if (Date.now() - data.timestamp < 24 * 60 * 60 * 1000 && data.activeWorkout) {
+        const confirmRestore = confirm('Odnaleziono niezakończony trening. Kontynuować?');
+        if (confirmRestore) {
+          if (window.WorkoutState) {
+            window.WorkoutState.restore(data);
+          }
+          if (typeof renderActiveWorkout === 'function') renderActiveWorkout();
+          showScreen('screen-active-workout', window.WorkoutState.activeWorkout.workoutName);
+          if (window.WorkoutState.isWaitingForRest && window.WorkoutState.savedRestSeconds > 0) {
+            const restCountdown = document.getElementById('rest-countdown');
+            const restSecondsEl = document.getElementById('rest-seconds');
+            const restTimerEl = document.getElementById('rest-timer');
+            if (restCountdown) restCountdown.classList.add('active');
+            if (restSecondsEl) restSecondsEl.textContent = window.WorkoutState.savedRestSeconds;
+            if (restTimerEl) restTimerEl.textContent = formatRestTime(window.WorkoutState.savedRestSeconds);
+            startRestTimer(window.WorkoutState.savedRestSeconds, (remaining) => {
+              if (!window.WorkoutState.isPaused) {
+                if (restSecondsEl) restSecondsEl.textContent = remaining;
+                if (restTimerEl) restTimerEl.textContent = formatRestTime(remaining);
+              }
+            }, () => {
+              window.WorkoutState.isWaitingForRest = false;
+              if (restCountdown) restCountdown.classList.remove('active');
+              if (restTimerEl) restTimerEl.textContent = '--:--';
+              vibrateRestDone();
+              if (typeof renderActiveWorkout === 'function') renderActiveWorkout();
+            });
+          }
+        }
+      }
+    } catch(e) { console.warn('Auto-restore failed', e); }
+  }
 });
 
-// --- SETTINGS ---
 function loadSettings() {
   AppState.darkMode = localStorage.getItem('gym-dark') !== 'false';
   AppState.language = localStorage.getItem('gym-lang') || 'pl';
-
   const darkToggle = document.getElementById('toggle-dark');
   if (darkToggle) darkToggle.checked = AppState.darkMode;
-
   const langSelect = document.getElementById('lang-select');
   if (langSelect) langSelect.value = AppState.language;
 }
@@ -252,7 +327,7 @@ function saveSettings() {
 
 function applyTheme() {
   document.documentElement.setAttribute('data-theme', AppState.darkMode ? 'dark' : 'light');
-  updateChartTheme();
+  if (typeof updateChartTheme === 'function') updateChartTheme();
 }
 
 function toggleDarkMode() {
@@ -266,18 +341,15 @@ function changeLanguage(lang) {
   AppState.language = lang;
   saveSettings();
   applyTranslations(lang);
-  
   renderExercisesList();
   renderWorkoutsList();
   renderStatsExerciseSelect();
   renderWorkoutExercisesSelect();
   renderHistoryList();
   renderMeasurementsHistory();
-  
-  showToast(lang === 'pl' ? 'Polski' : 'English', 'success');
+  showToast(lang === 'pl' ? t('polish') : t('english'), 'success');
 }
 
-// --- EVENT LISTENERS ---
 function setupEventListeners() {
   document.getElementById('btn-menu')?.addEventListener('click', () => {
     showScreen('screen-settings', t('settings'));
@@ -298,21 +370,19 @@ function setupEventListeners() {
   });
 
   document.getElementById('btn-back')?.addEventListener('click', () => {
-    if (AppState.isWorkoutActive && activeWorkout) {
-      finishWorkout();
+    if (AppState.isWorkoutActive && window.WorkoutState && window.WorkoutState.activeWorkout) {
+      if (typeof finishWorkout === 'function') finishWorkout();
       return;
     }
-
     if (AppState.currentScreen === 'screen-exercise-form' || AppState.currentScreen === 'screen-workout-form') {
       showScreen('screen-home', 'GymTracker Pro');
       return;
     }
-
     showScreen('screen-home', 'GymTracker Pro');
   });
 
   document.getElementById('btn-new-exercise')?.addEventListener('click', () => {
-    resetExerciseForm();
+    if (typeof resetExerciseForm === 'function') resetExerciseForm();
     showScreen('screen-exercise-form', t('define_exercise'));
   });
 
@@ -322,7 +392,6 @@ function setupEventListeners() {
 
   document.getElementById('exercise-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-
     const id = document.getElementById('ex-id').value;
     const exercise = {
       name: document.getElementById('ex-name').value.trim(),
@@ -330,12 +399,10 @@ function setupEventListeners() {
       weight: parseFloat(document.getElementById('ex-weight').value) || 0,
       reps: parseInt(document.getElementById('ex-reps').value) || 8
     };
-
     if (!exercise.name) {
       showToast(t('fill_required'), 'error');
       return;
     }
-
     try {
       if (id) {
         exercise.id = parseInt(id);
@@ -347,6 +414,7 @@ function setupEventListeners() {
       }
       await renderExercisesList();
       await renderWorkoutsList();
+      await renderStatsExerciseSelect();
       showScreen('screen-home', 'GymTracker Pro');
     } catch (err) {
       console.error(err);
@@ -355,8 +423,8 @@ function setupEventListeners() {
   });
 
   document.getElementById('btn-new-workout')?.addEventListener('click', async () => {
-    resetWorkoutForm();
-    await renderWorkoutExercisesSelect();
+    if (typeof resetWorkoutForm === 'function') resetWorkoutForm();
+    if (typeof renderWorkoutExercisesSelect === 'function') await renderWorkoutExercisesSelect();
     showScreen('screen-workout-form', t('define_workout'));
   });
 
@@ -366,29 +434,23 @@ function setupEventListeners() {
 
   document.getElementById('workout-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-
     const id = document.getElementById('wo-id').value;
     const name = document.getElementById('wo-name').value.trim();
     const sets = parseInt(document.getElementById('wo-sets').value) || 4;
     const rest = parseInt(document.getElementById('wo-rest').value) || 90;
-
     const selectedExercises = [];
     document.querySelectorAll('#wo-exercises-select input[type="checkbox"]:checked').forEach(cb => {
       selectedExercises.push(parseInt(cb.value));
     });
-
     if (!name) {
       showToast(t('fill_required'), 'error');
       return;
     }
-
     if (selectedExercises.length === 0) {
       showToast(t('no_exercises_selected'), 'error');
       return;
     }
-
     const workout = { name, sets, rest, exercises: selectedExercises };
-
     try {
       if (id) {
         workout.id = parseInt(id);
@@ -407,63 +469,62 @@ function setupEventListeners() {
   });
 
   document.getElementById('btn-pause-workout')?.addEventListener('click', () => {
-    pauseWorkout();
+    if (typeof pauseWorkout === 'function') pauseWorkout();
   });
 
   document.getElementById('btn-resume')?.addEventListener('click', () => {
-    resumeWorkout();
+    if (typeof resumeWorkout === 'function') resumeWorkout();
   });
 
   document.getElementById('pause-overlay')?.addEventListener('click', (e) => {
     if (e.target.id === 'pause-overlay' || e.target.closest('.pause-content')) {
-      resumeWorkout();
+      if (typeof resumeWorkout === 'function') resumeWorkout();
     }
   });
 
   document.getElementById('btn-rest-minus')?.addEventListener('click', () => {
-    adjustQuickRest(-15);
+    if (typeof adjustQuickRest === 'function') adjustQuickRest(-15);
   });
 
   document.getElementById('btn-rest-plus')?.addEventListener('click', () => {
-    adjustQuickRest(15);
+    if (typeof adjustQuickRest === 'function') adjustQuickRest(15);
   });
 
   document.getElementById('btn-rounds-minus')?.addEventListener('click', () => {
-    adjustTotalRounds(-1);
+    if (typeof adjustTotalRounds === 'function') adjustTotalRounds(-1);
   });
 
   document.getElementById('btn-rounds-plus')?.addEventListener('click', () => {
-    adjustTotalRounds(1);
+    if (typeof adjustTotalRounds === 'function') adjustTotalRounds(1);
   });
 
   document.getElementById('check-all-exercises')?.addEventListener('change', (e) => {
-    toggleCheckAll(e.target.checked);
+    if (typeof toggleCheckAll === 'function') toggleCheckAll(e.target.checked);
   });
 
   document.getElementById('btn-complete-round')?.addEventListener('click', () => {
-    completeRound();
+    if (typeof completeRound === 'function') completeRound();
   });
 
   document.getElementById('btn-finish-workout')?.addEventListener('click', () => {
-    finishWorkout();
+    if (typeof finishWorkout === 'function') finishWorkout();
   });
 
   document.querySelectorAll('.stats-tabs .tab-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       document.querySelectorAll('.stats-tabs .tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      await updateStatsChart(btn.dataset.tab);
+      if (typeof updateStatsChart === 'function') await updateStatsChart(btn.dataset.tab);
     });
   });
 
   document.getElementById('stats-exercise-select')?.addEventListener('change', async () => {
     const activeTab = document.querySelector('.stats-tabs .tab-btn.active');
-    if (activeTab) await updateStatsChart(activeTab.dataset.tab);
+    if (activeTab && typeof updateStatsChart === 'function') await updateStatsChart(activeTab.dataset.tab);
   });
 
   document.getElementById('measurements-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-
     const measurement = {
       date: document.getElementById('ms-date').value,
       chest: parseFloat(document.getElementById('ms-chest').value) || null,
@@ -473,12 +534,10 @@ function setupEventListeners() {
       thighLeft: parseFloat(document.getElementById('ms-thigh-left').value) || null,
       waist: parseFloat(document.getElementById('ms-waist').value) || null
     };
-
     if (!measurement.date) {
       showToast(t('fill_required'), 'error');
       return;
     }
-
     try {
       await addMeasurement(measurement);
       showToast(t('saved'), 'success');
@@ -488,7 +547,7 @@ function setupEventListeners() {
       document.getElementById('ms-thigh-right').value = '';
       document.getElementById('ms-thigh-left').value = '';
       document.getElementById('ms-waist').value = '';
-      await renderMeasurementsHistory();
+      if (typeof renderMeasurementsHistory === 'function') await renderMeasurementsHistory();
     } catch (err) {
       console.error(err);
       showToast(t('error'), 'error');
@@ -505,7 +564,12 @@ function setupEventListeners() {
     changeLanguage(e.target.value);
   });
 
+  // Eksport z spinnerem
   document.getElementById('btn-export')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-export');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Eksportowanie...';
     try {
       const data = await exportAllData();
       const blob = new Blob([data], { type: 'application/json' });
@@ -519,6 +583,9 @@ function setupEventListeners() {
     } catch (err) {
       console.error(err);
       showToast(t('error'), 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
     }
   });
 
@@ -529,12 +596,27 @@ function setupEventListeners() {
   document.getElementById('import-file')?.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
+    const btn = document.getElementById('btn-import');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Importowanie...';
     try {
       const text = await file.text();
+      
+      // Walidacja JSON przed czyszczeniem bazy
+      let parsedData;
+      try {
+        parsedData = JSON.parse(text);
+      } catch (err) {
+        throw new Error(t('import_error_json_format'));
+      }
+      
+      if (!parsedData || typeof parsedData !== 'object' || (!parsedData.exercises && !parsedData.workouts)) {
+        throw new Error(t('import_error_invalid_data'));
+      }
+
       await importAllData(text);
       showToast(t('import_success'), 'success');
-
       await renderExercisesList();
       await renderWorkoutsList();
       await renderHistoryList();
@@ -543,18 +625,21 @@ function setupEventListeners() {
       await renderWorkoutExercisesSelect();
     } catch (err) {
       console.error(err);
-      showToast(t('import_error'), 'error');
+      const msg = (err.message.includes(t('import_error_json_format')) || err.message.includes(t('import_error_invalid_data'))) ? err.message : t('import_error');
+      showToast(msg, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
     }
     e.target.value = '';
   });
 
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && audioCtx && audioCtx.state === 'suspended') {
+    if (!document.hidden && typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume();
     }
   });
 
-  // Przycisk sprawdzania aktualizacji
   document.getElementById('check-updates-btn')?.addEventListener('click', () => {
     checkForUpdates();
   });
@@ -563,37 +648,37 @@ function setupEventListeners() {
 async function updateStatsChart(tabType) {
   const exerciseSelect = document.getElementById('stats-exercise-select');
   const exerciseId = exerciseSelect?.value;
-
   if (tabType === 'weight-chart') {
-    if (!exerciseId) {
-      renderStatsChart('weight-chart', [], [], t('select_exercise'));
-      renderStatsSummary([], 'weight-chart');
+    if (!exerciseId || exerciseId === '') {
+      if (typeof renderStatsChart === 'function') renderStatsChart('weight-chart', [], [], t('select_exercise'));
+      if (typeof renderStatsSummary === 'function') renderStatsSummary([], 'weight-chart');
       return;
     }
     const stats = await getExerciseStats(parseInt(exerciseId));
     const labels = stats.map(s => s.date.split('T')[0]);
     const data = stats.map(s => ({ maxWeight: s.maxWeight, volume: s.totalVolume }));
     const exercise = await getExercise(parseInt(exerciseId));
-    renderStatsChart('weight-chart', data, labels, exercise?.name || t('weight'));
-    renderStatsSummary(stats, 'weight-chart');
+    if (typeof renderStatsChart === 'function') renderStatsChart('weight-chart', data, labels, exercise?.name || t('weight'));
+    if (typeof renderStatsSummary === 'function') renderStatsSummary(stats, 'weight-chart');
   } else if (tabType === 'volume-chart') {
     const volumeStats = await getVolumeStats();
     const labels = volumeStats.map(s => s.date);
     const data = volumeStats.map(s => ({ volume: s.volume }));
-    renderStatsChart('volume-chart', data, labels, t('volume'));
-    renderStatsSummary(volumeStats.map(s => ({ volume: s.volume })), 'volume-chart');
+    if (typeof renderStatsChart === 'function') renderStatsChart('volume-chart', data, labels, t('volume'));
+    if (typeof renderStatsSummary === 'function') renderStatsSummary(volumeStats.map(s => ({ volume: s.volume })), 'volume-chart');
   }
 }
 
-const originalShowScreen = showScreen;
-showScreen = function(screenId, title) {
-  AppState.currentScreen = screenId;
-  AppState.isWorkoutActive = (screenId === 'screen-active-workout');
-  originalShowScreen(screenId, title);
-};
+// BEFOREUNLOAD – ostrzeżenie przed zamknięciem strony podczas aktywnego treningu
+window.addEventListener('beforeunload', (e) => {
+  if (window.WorkoutState && window.WorkoutState.activeWorkout && !window.WorkoutState.isPaused) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 
+// PWA INSTALL
 let deferredPrompt;
-
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
@@ -605,7 +690,7 @@ function showInstallButton() {
   if (!btn) {
     btn = document.createElement('button');
     btn.id = 'pwa-install-btn';
-    btn.textContent = 'Zainstaluj aplikację';
+    btn.textContent = t('install_app');
     btn.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;padding:12px 24px;background:#00d4aa;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);display:none;';
     document.body.appendChild(btn);
   }
