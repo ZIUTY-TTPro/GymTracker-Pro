@@ -16,7 +16,7 @@ if (isLocalFile) {
 // ZARZĄDZANIE WERSJĄ I AKTUALIZACJAMI
 // ============================================
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.0.0';
 let swRegistration = null;
 let updateBannerShown = false;
 
