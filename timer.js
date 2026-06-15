@@ -1,10 +1,13 @@
 let restTimerInterval = null;
 let restTimeRemaining = 0;
+let restTargetTime = 0;
 let restCallback = null;
+let lastBeepSecond = -1;
+
 let sessionTimerInterval = null;
 let sessionSeconds = 0;
+let sessionStartTime = 0;
 
-// --- AUDIO CONTEXT (Web Audio API) ---
 let audioCtx = null;
 
 function getAudioContext() {
@@ -14,22 +17,17 @@ function getAudioContext() {
   return audioCtx;
 }
 
-// Play beep sound
 function playBeep(frequency = 800, duration = 0.15, type = 'sine') {
   try {
     const ctx = getAudioContext();
     const oscillator = ctx.createOscillator();
     const gainNode = ctx.createGain();
-
     oscillator.type = type;
     oscillator.frequency.value = frequency;
-
     oscillator.connect(gainNode);
     gainNode.connect(ctx.destination);
-
     gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
-
     oscillator.start(ctx.currentTime);
     oscillator.stop(ctx.currentTime + duration);
   } catch (e) {
@@ -37,7 +35,6 @@ function playBeep(frequency = 800, duration = 0.15, type = 'sine') {
   }
 }
 
-// Play countdown beeps (3 short beeps + 1 long)
 function playCountdownBeep(secondsLeft) {
   if (secondsLeft <= 3 && secondsLeft > 0) {
     playBeep(1000, 0.1, 'square');
@@ -47,11 +44,10 @@ function playCountdownBeep(secondsLeft) {
   }
 }
 
-// Play finish sound
 function playFinishSound() {
   try {
     const ctx = getAudioContext();
-    const notes = [523, 659, 784, 1047]; // C E G C
+    const notes = [523, 659, 784, 1047];
     notes.forEach((freq, i) => {
       setTimeout(() => {
         const osc = ctx.createOscillator();
@@ -71,28 +67,42 @@ function playFinishSound() {
   }
 }
 
-// --- REST TIMER ---
+// ==========================
+// REST TIMER (oparty na Date.now)
+// ==========================
 function startRestTimer(seconds, onTick, onFinish) {
-  stopRestTimer();
+  if (restTimerInterval) stopRestTimer();
+
   restTimeRemaining = seconds;
+  restTargetTime = Date.now() + seconds * 1000;
   restCallback = onFinish;
+  lastBeepSecond = -1;
 
   if (onTick) onTick(restTimeRemaining);
 
   restTimerInterval = setInterval(() => {
-    restTimeRemaining--;
+    const now = Date.now();
+    let remaining = Math.round((restTargetTime - now) / 1000);
+    if (remaining < 0) remaining = 0;
 
-    playCountdownBeep(restTimeRemaining);
+    if (remaining !== restTimeRemaining) {
+      restTimeRemaining = remaining;
+      if (onTick) onTick(restTimeRemaining);
+    }
 
-    if (onTick) onTick(restTimeRemaining);
+    // Dźwięk tylko przy zmianie pełnej sekundy
+    if (remaining >= 0 && remaining !== lastBeepSecond) {
+      playCountdownBeep(remaining);
+      lastBeepSecond = remaining;
+    }
 
-    if (restTimeRemaining <= 0) {
+    if (remaining <= 0) {
       const cb = restCallback;
       stopRestTimer();
       playFinishSound();
       if (cb) cb();
     }
-  }, 1000);
+  }, 500);
 }
 
 function stopRestTimer() {
@@ -101,7 +111,9 @@ function stopRestTimer() {
     restTimerInterval = null;
   }
   restTimeRemaining = 0;
+  restTargetTime = 0;
   restCallback = null;
+  lastBeepSecond = -1;
 }
 
 function pauseRestTimer() {
@@ -109,21 +121,38 @@ function pauseRestTimer() {
     clearInterval(restTimerInterval);
     restTimerInterval = null;
   }
+  // restTimeRemaining zachowuje aktualną pozostałą liczbę sekund
 }
 
 function resumeRestTimer(onTick, onFinish) {
   if (restTimeRemaining > 0 && !restTimerInterval) {
     restCallback = onFinish;
+    restTargetTime = Date.now() + restTimeRemaining * 1000;
+    lastBeepSecond = -1;
+
+    if (onTick) onTick(restTimeRemaining);
+
     restTimerInterval = setInterval(() => {
-      restTimeRemaining--;
-      playCountdownBeep(restTimeRemaining);
-      if (onTick) onTick(restTimeRemaining);
-      if (restTimeRemaining <= 0) {
+      const now = Date.now();
+      let remaining = Math.round((restTargetTime - now) / 1000);
+      if (remaining < 0) remaining = 0;
+
+      if (remaining !== restTimeRemaining) {
+        restTimeRemaining = remaining;
+        if (onTick) onTick(restTimeRemaining);
+      }
+
+      if (remaining >= 0 && remaining !== lastBeepSecond) {
+        playCountdownBeep(remaining);
+        lastBeepSecond = remaining;
+      }
+
+      if (remaining <= 0) {
         stopRestTimer();
         playFinishSound();
         if (restCallback) restCallback();
       }
-    }, 1000);
+    }, 500);
   }
 }
 
@@ -135,15 +164,17 @@ function isRestTimerRunning() {
   return restTimerInterval !== null;
 }
 
-// --- SESSION TIMER ---
+// ==========================
+// SESSION TIMER (oparty na Date.now)
+// ==========================
 function startSessionTimer(onTick) {
   stopSessionTimer();
   sessionSeconds = 0;
-
-  if (onTick) onTick(formatTime(sessionSeconds));
+  sessionStartTime = Date.now();
+  if (onTick) onTick(formatTime(0));
 
   sessionTimerInterval = setInterval(() => {
-    sessionSeconds++;
+    sessionSeconds = Math.floor((Date.now() - sessionStartTime) / 1000);
     if (onTick) onTick(formatTime(sessionSeconds));
   }, 1000);
 }
@@ -165,8 +196,9 @@ function pauseSessionTimer() {
 
 function resumeSessionTimer(onTick) {
   if (!sessionTimerInterval) {
+    sessionStartTime = Date.now() - sessionSeconds * 1000;
     sessionTimerInterval = setInterval(() => {
-      sessionSeconds++;
+      sessionSeconds = Math.floor((Date.now() - sessionStartTime) / 1000);
       if (onTick) onTick(formatTime(sessionSeconds));
     }, 1000);
   }
@@ -176,12 +208,13 @@ function getSessionSeconds() {
   return sessionSeconds;
 }
 
-// --- UTILS ---
+// ==========================
+// FORMATOWANIE
+// ==========================
 function formatTime(totalSeconds) {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-
   if (hours > 0) {
     return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }
@@ -194,7 +227,9 @@ function formatRestTime(seconds) {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
-// --- VIBRATION ---
+// ==========================
+// VIBRACJE
+// ==========================
 function vibrate(pattern) {
   if ('vibrate' in navigator) {
     navigator.vibrate(pattern);
@@ -212,3 +247,15 @@ function vibrateRestDone() {
 function vibrateSetComplete() {
   vibrate([30]);
 }
+
+// Odblokowanie AudioContext po pierwszej interakcji użytkownika (wymagane przez iOS/Chrome Autoplay Policy)
+document.body.addEventListener('pointerdown', function unlockAudio() {
+  const ctx = getAudioContext();
+  if (ctx.state === 'suspended') {
+    ctx.resume().then(() => {
+      console.log('AudioContext odblokowany');
+    });
+  }
+  // Usuwamy nasłuchiwacz po pierwszym uruchomieniu, żeby nie obciążać aplikacji
+  document.body.removeEventListener('pointerdown', unlockAudio);
+}, { once: true });
