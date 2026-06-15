@@ -135,6 +135,7 @@ async function deleteExerciseItem(id) {
     showToast(t('deleted'), 'success');
     renderExercisesList();
     renderWorkoutsList();
+    renderStatsExerciseSelect();
   } catch (e) { showToast(t('error'), 'error'); }
 }
 
@@ -166,7 +167,6 @@ async function renderWorkoutExercisesSelect() {
     const checkbox = item.querySelector('input[type="checkbox"]');
     const checkCircle = item.querySelector('.check-circle');
     
-    // TYLKO kółeczko jest klikalne
     checkCircle.addEventListener('click', (e) => {
       e.stopPropagation();
       checkbox.checked = !checkbox.checked;
@@ -220,14 +220,65 @@ async function deleteWorkoutItem(id) {
 }
 
 // ============================================
-// ACTIVE WORKOUT - SUPERSERIE LOGIC
+// ACTIVE WORKOUT - CENTRALNY STAN
 // ============================================
-let activeWorkout = null;
-let currentRound = 0;
-let isPaused = false;
-let savedRestSeconds = 0;
-let isWaitingForRest = false;
-let isLastRoundReady = false;
+
+window.WorkoutState = {
+  activeWorkout: null,
+  currentRound: 0,
+  isPaused: false,
+  savedRestSeconds: 0,
+  isWaitingForRest: false,
+  isLastRoundReady: false,
+
+  reset() {
+    this.activeWorkout = null;
+    this.currentRound = 0;
+    this.isPaused = false;
+    this.savedRestSeconds = 0;
+    this.isWaitingForRest = false;
+    this.isLastRoundReady = false;
+  },
+
+  save() {
+    if (!this.activeWorkout) {
+      localStorage.removeItem('gym-autosave');
+      return;
+    }
+    localStorage.setItem('gym-autosave', JSON.stringify({
+      activeWorkout: this.activeWorkout,
+      currentRound: this.currentRound,
+      isWaitingForRest: this.isWaitingForRest,
+      savedRestSeconds: typeof getRestTimeRemaining === 'function' ? getRestTimeRemaining() : this.savedRestSeconds,
+      isLastRoundReady: this.isLastRoundReady,
+      timestamp: Date.now()
+    }));
+  },
+
+  restore(savedData) {
+    this.activeWorkout = savedData.activeWorkout || null;
+    this.currentRound = savedData.currentRound || 0;
+    this.isWaitingForRest = savedData.isWaitingForRest || false;
+    this.savedRestSeconds = savedData.savedRestSeconds || 0;
+    this.isLastRoundReady = savedData.isLastRoundReady || false;
+    this.isPaused = false;
+
+    if (this.isLastRoundReady) {
+      const finishBtn = document.getElementById('btn-finish-workout');
+      if (finishBtn) {
+        finishBtn.classList.add('ready-to-finish');
+        finishBtn.style.background = 'var(--success)';
+        finishBtn.style.border = '2px solid var(--success)';
+        finishBtn.style.color = '#000';
+        finishBtn.style.fontWeight = '700';
+      }
+    }
+  }
+};
+
+// ============================================
+// LOGIKA AKTYWNEGO TRENINGU
+// ============================================
 
 async function startWorkout(workoutId) {
   const workout = await getWorkout(workoutId);
@@ -237,6 +288,12 @@ async function startWorkout(workoutId) {
   }
 
   const exercises = await getAllExercises();
+  const missing = workout.exercises.some(exId => !exercises.find(e => e.id === exId));
+  if (missing) {
+    showToast(t('some_exercises_missing'), 'error');
+    return;
+  }
+
   const workoutExercises = [];
 
   for (const exId of workout.exercises) {
@@ -258,7 +315,8 @@ async function startWorkout(workoutId) {
     }
   }
 
-  activeWorkout = {
+  window.WorkoutState.reset();
+  window.WorkoutState.activeWorkout = {
     workoutId: workout.id,
     workoutName: workout.name,
     totalSets: workout.sets || 4,
@@ -267,17 +325,11 @@ async function startWorkout(workoutId) {
     startTime: new Date().toISOString()
   };
 
-  currentRound = 0;
-  isPaused = false;
-  savedRestSeconds = 0;
-  isWaitingForRest = false;
-  isLastRoundReady = false;
-
   const pauseOverlay = document.getElementById('pause-overlay');
   if (pauseOverlay) pauseOverlay.classList.add('hidden');
 
   const quickRest = document.getElementById('quick-rest');
-  if (quickRest) quickRest.value = activeWorkout.restSeconds;
+  if (quickRest) quickRest.value = window.WorkoutState.activeWorkout.restSeconds;
 
   const checkAll = document.getElementById('check-all-exercises');
   if (checkAll) checkAll.checked = false;
@@ -290,7 +342,7 @@ async function startWorkout(workoutId) {
   }
 
   startSessionTimer(time => {
-    if (!isPaused) {
+    if (!window.WorkoutState.isPaused) {
       const timerEl = document.getElementById('session-timer');
       if (timerEl) timerEl.textContent = time;
     }
@@ -299,23 +351,25 @@ async function startWorkout(workoutId) {
   renderActiveWorkout();
   showScreen('screen-active-workout', workout.name);
   showToast(t('workout_started'), 'success');
+
+  window.WorkoutState.save();
 }
 
 function renderActiveWorkout() {
-  if (!activeWorkout) return;
+  if (!window.WorkoutState.activeWorkout) return;
 
   const currentRoundSpan = document.getElementById('current-round');
   const totalRoundsSpan = document.getElementById('total-rounds');
 
-  if (currentRoundSpan) currentRoundSpan.textContent = currentRound + 1;
-  if (totalRoundsSpan) totalRoundsSpan.textContent = activeWorkout.totalSets;
+  if (currentRoundSpan) currentRoundSpan.textContent = window.WorkoutState.currentRound + 1;
+  if (totalRoundsSpan) totalRoundsSpan.textContent = window.WorkoutState.activeWorkout.totalSets;
 
   const tbody = document.getElementById('superset-tbody');
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  activeWorkout.exercises.forEach((ex, exIndex) => {
-    const round = ex.rounds[currentRound];
+  window.WorkoutState.activeWorkout.exercises.forEach((ex, exIndex) => {
+    const round = ex.rounds[window.WorkoutState.currentRound];
     const isDone = round.completed;
 
     const tr = document.createElement('tr');
@@ -323,10 +377,10 @@ function renderActiveWorkout() {
 
     tr.innerHTML = `
       <td>${escapeHtml(ex.name)}</td>
-      <td><input type="number" id="w-${exIndex}_${currentRound}" value="${round.weight}" step="0.5" min="0"></td>
-      <td><input type="number" id="r-${exIndex}_${currentRound}" value="${round.reps}" min="1" max="100"></td>
+      <td><input type="number" id="w-${exIndex}_${window.WorkoutState.currentRound}" value="${round.weight}" step="0.5" min="0"></td>
+      <td><input type="number" id="r-${exIndex}_${window.WorkoutState.currentRound}" value="${round.reps}" min="1" max="100"></td>
       <td class="check-cell">
-        <button class="check-btn ${isDone ? 'checked' : ''}" data-ex="${exIndex}" data-round="${currentRound}">
+        <button class="check-btn ${isDone ? 'checked' : ''}" data-ex="${exIndex}" data-round="${window.WorkoutState.currentRound}">
           ${isDone ? '✓' : ''}
         </button>
       </td>
@@ -334,24 +388,25 @@ function renderActiveWorkout() {
 
     const checkBtn = tr.querySelector('.check-btn');
     checkBtn.addEventListener('click', () => {
-      if (isPaused) {
+      if (window.WorkoutState.isPaused) {
         showToast(t('resume_to_continue'), 'info');
         return;
       }
-      if (isWaitingForRest) {
+      if (window.WorkoutState.isWaitingForRest) {
         showToast(t('wait_for_rest'), 'info');
         return;
       }
       round.completed = !round.completed;
       if (round.completed) {
-        const wInput = document.getElementById(`w-${exIndex}_${currentRound}`);
-        const rInput = document.getElementById(`r-${exIndex}_${currentRound}`);
+        const wInput = document.getElementById(`w-${exIndex}_${window.WorkoutState.currentRound}`);
+        const rInput = document.getElementById(`r-${exIndex}_${window.WorkoutState.currentRound}`);
         round.weight = wInput ? (parseFloat(wInput.value) || ex.defaultWeight) : ex.defaultWeight;
         round.reps = rInput ? (parseInt(rInput.value) || ex.defaultReps) : ex.defaultReps;
         vibrateShort();
       }
       renderActiveWorkout();
       updateCompleteButton();
+      window.WorkoutState.save();
     });
 
     tbody.appendChild(tr);
@@ -359,28 +414,28 @@ function renderActiveWorkout() {
 
   const checkAll = document.getElementById('check-all-exercises');
   if (checkAll) {
-    const allChecked = activeWorkout.exercises.every(ex => ex.rounds[currentRound].completed);
+    const allChecked = window.WorkoutState.activeWorkout.exercises.every(ex => ex.rounds[window.WorkoutState.currentRound].completed);
     checkAll.checked = allChecked;
   }
 
   const restCountdown = document.getElementById('rest-countdown');
-  if (restCountdown && !isWaitingForRest) restCountdown.classList.remove('active');
+  if (restCountdown && !window.WorkoutState.isWaitingForRest) restCountdown.classList.remove('active');
 
   const restTimerEl = document.getElementById('rest-timer');
-  if (restTimerEl && !isWaitingForRest) restTimerEl.textContent = '--:--';
+  if (restTimerEl && !window.WorkoutState.isWaitingForRest) restTimerEl.textContent = '--:--';
 
   updateCompleteButton();
 }
 
 function updateCompleteButton() {
   const btn = document.getElementById('btn-complete-round');
-  if (!btn || !activeWorkout) return;
+  if (!btn || !window.WorkoutState.activeWorkout) return;
 
   btn.disabled = false;
 
-  const doneCount = activeWorkout.exercises.filter(ex => ex.rounds[currentRound].completed).length;
-  const total = activeWorkout.exercises.length;
-  const isLastRound = (currentRound + 1 === activeWorkout.totalSets);
+  const doneCount = window.WorkoutState.activeWorkout.exercises.filter(ex => ex.rounds[window.WorkoutState.currentRound].completed).length;
+  const total = window.WorkoutState.activeWorkout.exercises.length;
+  const isLastRound = (window.WorkoutState.currentRound + 1 === window.WorkoutState.activeWorkout.totalSets);
 
   if (doneCount === total) {
     if (isLastRound) {
@@ -398,28 +453,28 @@ function updateCompleteButton() {
 }
 
 function toggleCheckAll(checked) {
-  if (!activeWorkout) return;
+  if (!window.WorkoutState.activeWorkout) return;
 
-  if (isPaused) {
+  if (window.WorkoutState.isPaused) {
     showToast(t('resume_to_continue'), 'info');
     const checkAll = document.getElementById('check-all-exercises');
     if (checkAll) checkAll.checked = !checked;
     return;
   }
 
-  if (isWaitingForRest) {
+  if (window.WorkoutState.isWaitingForRest) {
     showToast(t('wait_for_rest'), 'info');
     const checkAll = document.getElementById('check-all-exercises');
     if (checkAll) checkAll.checked = !checked;
     return;
   }
 
-  activeWorkout.exercises.forEach((ex, i) => {
-    const round = ex.rounds[currentRound];
+  window.WorkoutState.activeWorkout.exercises.forEach((ex, i) => {
+    const round = ex.rounds[window.WorkoutState.currentRound];
     round.completed = checked;
     if (checked) {
-      const wInput = document.getElementById(`w-${i}_${currentRound}`);
-      const rInput = document.getElementById(`r-${i}_${currentRound}`);
+      const wInput = document.getElementById(`w-${i}_${window.WorkoutState.currentRound}`);
+      const rInput = document.getElementById(`r-${i}_${window.WorkoutState.currentRound}`);
       round.weight = wInput ? (parseFloat(wInput.value) || ex.defaultWeight) : ex.defaultWeight;
       round.reps = rInput ? (parseInt(rInput.value) || ex.defaultReps) : ex.defaultReps;
     }
@@ -427,28 +482,29 @@ function toggleCheckAll(checked) {
   if (checked) vibrateShort();
   renderActiveWorkout();
   updateCompleteButton();
+  window.WorkoutState.save();
 }
 
 function completeRound() {
-  if (!activeWorkout || isPaused) return;
+  if (!window.WorkoutState.activeWorkout || window.WorkoutState.isPaused) return;
 
-  if (isWaitingForRest) {
+  if (window.WorkoutState.isWaitingForRest) {
     showToast(t('rest_in_progress'), 'info');
     return;
   }
 
-  activeWorkout.exercises.forEach((ex, i) => {
-    const round = ex.rounds[currentRound];
-    const wInput = document.getElementById(`w-${i}_${currentRound}`);
-    const rInput = document.getElementById(`r-${i}_${currentRound}`);
+  window.WorkoutState.activeWorkout.exercises.forEach((ex, i) => {
+    const round = ex.rounds[window.WorkoutState.currentRound];
+    const wInput = document.getElementById(`w-${i}_${window.WorkoutState.currentRound}`);
+    const rInput = document.getElementById(`r-${i}_${window.WorkoutState.currentRound}`);
     if (wInput) round.weight = parseFloat(wInput.value) || ex.defaultWeight;
     if (rInput) round.reps = parseInt(rInput.value) || ex.defaultReps;
   });
 
-  const isLastRound = (currentRound + 1 === activeWorkout.totalSets);
+  const isLastRound = (window.WorkoutState.currentRound + 1 === window.WorkoutState.activeWorkout.totalSets);
 
   if (isLastRound) {
-    const allCompleted = activeWorkout.exercises.every(ex => ex.rounds[currentRound].completed);
+    const allCompleted = window.WorkoutState.activeWorkout.exercises.every(ex => ex.rounds[window.WorkoutState.currentRound].completed);
 
     if (allCompleted) {
       const finishBtn = document.getElementById('btn-finish-workout');
@@ -459,7 +515,8 @@ function completeRound() {
         finishBtn.style.color = '#000';
         finishBtn.style.fontWeight = '700';
       }
-      isLastRoundReady = true;
+      window.WorkoutState.isLastRoundReady = true;
+      window.WorkoutState.save();
       showToast(t('click_finish_to_save'), 'success');
     } else {
       showToast(t('check_all_exercises_to_finish'), 'info');
@@ -467,12 +524,11 @@ function completeRound() {
     return;
   }
 
-  currentRound++;
+  window.WorkoutState.currentRound++;
+  const prevRound = window.WorkoutState.currentRound - 1;
+  const currentRoundData = window.WorkoutState.currentRound;
 
-  const prevRound = currentRound - 1;
-  const currentRoundData = currentRound;
-
-  activeWorkout.exercises.forEach((ex, i) => {
+  window.WorkoutState.activeWorkout.exercises.forEach((ex, i) => {
     const prevRoundCompleted = ex.rounds[prevRound].completed;
     const currentRoundCompleted = ex.rounds[currentRoundData].completed;
 
@@ -483,10 +539,10 @@ function completeRound() {
     }
   });
 
-  isWaitingForRest = true;
+  window.WorkoutState.isWaitingForRest = true;
 
   const quickRest = document.getElementById('quick-rest');
-  const restSeconds = quickRest ? (parseInt(quickRest.value) || activeWorkout.restSeconds) : activeWorkout.restSeconds;
+  const restSeconds = quickRest ? (parseInt(quickRest.value) || window.WorkoutState.activeWorkout.restSeconds) : window.WorkoutState.activeWorkout.restSeconds;
 
   const restCountdown = document.getElementById('rest-countdown');
   const restSecondsEl = document.getElementById('rest-seconds');
@@ -497,44 +553,44 @@ function completeRound() {
   if (restTimerEl) restTimerEl.textContent = formatRestTime(restSeconds);
 
   startRestTimer(restSeconds, (remaining) => {
-    if (!isPaused) {
+    if (!window.WorkoutState.isPaused) {
       if (restSecondsEl) restSecondsEl.textContent = remaining;
       if (restTimerEl) restTimerEl.textContent = formatRestTime(remaining);
     }
   }, () => {
-    console.log('✅ Rest finished, moving to round', currentRound + 1);
-
-    isWaitingForRest = false;
+    window.WorkoutState.isWaitingForRest = false;
 
     if (restCountdown) restCountdown.classList.remove('active');
     if (restTimerEl) restTimerEl.textContent = '--:--';
 
     vibrateRestDone();
-    showToast(t('round_x_of_y', null, currentRound + 1, activeWorkout.totalSets), 'success');
+    showToast(t('round_x_of_y', null, window.WorkoutState.currentRound + 1, window.WorkoutState.activeWorkout.totalSets), 'success');
 
     renderActiveWorkout();
     vibrateSetComplete();
+    window.WorkoutState.save();
   });
 
-  showToast(t('rest_x_next_round_y', null, restSeconds, currentRound + 1), 'info');
+  showToast(t('rest_x_next_round_y', null, restSeconds, window.WorkoutState.currentRound + 1), 'info');
 }
 
 function pauseWorkout() {
-  if (!activeWorkout) return;
-  isPaused = true;
+  if (!window.WorkoutState.activeWorkout) return;
+  window.WorkoutState.isPaused = true;
   pauseSessionTimer();
-  savedRestSeconds = getRestTimeRemaining();
+  window.WorkoutState.savedRestSeconds = getRestTimeRemaining();
   pauseRestTimer();
 
   const pauseOverlay = document.getElementById('pause-overlay');
   if (pauseOverlay) pauseOverlay.classList.remove('hidden');
 
+  window.WorkoutState.save();
   showToast(t('workout_paused'), 'info');
 }
 
 function resumeWorkout() {
-  if (!activeWorkout) return;
-  isPaused = false;
+  if (!window.WorkoutState.activeWorkout) return;
+  window.WorkoutState.isPaused = false;
 
   const pauseOverlay = document.getElementById('pause-overlay');
   if (pauseOverlay) pauseOverlay.classList.add('hidden');
@@ -544,37 +600,38 @@ function resumeWorkout() {
     if (timerEl) timerEl.textContent = time;
   });
 
-  if (savedRestSeconds > 0 && isWaitingForRest) {
+  if (window.WorkoutState.savedRestSeconds > 0 && window.WorkoutState.isWaitingForRest) {
     const restCountdown = document.getElementById('rest-countdown');
     const restSecondsEl = document.getElementById('rest-seconds');
     const restTimerEl = document.getElementById('rest-timer');
 
     if (restCountdown) restCountdown.classList.add('active');
 
-    startRestTimer(savedRestSeconds, (remaining) => {
+    startRestTimer(window.WorkoutState.savedRestSeconds, (remaining) => {
       if (restSecondsEl) restSecondsEl.textContent = remaining;
       if (restTimerEl) restTimerEl.textContent = formatRestTime(remaining);
     }, () => {
-      isWaitingForRest = false;
+      window.WorkoutState.isWaitingForRest = false;
       if (restCountdown) restCountdown.classList.remove('active');
       if (restTimerEl) restTimerEl.textContent = '--:--';
       vibrateRestDone();
-      showToast(t('round_x_of_y', null, currentRound + 1, activeWorkout.totalSets), 'success');
+      showToast(t('round_x_of_y', null, window.WorkoutState.currentRound + 1, window.WorkoutState.activeWorkout.totalSets), 'success');
       renderActiveWorkout();
     });
 
-    savedRestSeconds = 0;
+    window.WorkoutState.savedRestSeconds = 0;
   }
 
+  window.WorkoutState.save();
   showToast(t('resume_workout'), 'success');
 }
 
 function adjustQuickRest(delta) {
-  if (isWaitingForRest) {
+  if (window.WorkoutState.isWaitingForRest) {
     showToast(t('cannot_change_rest'), 'info');
     return;
   }
-  if (isPaused) {
+  if (window.WorkoutState.isPaused) {
     showToast(t('resume_to_continue'), 'info');
     return;
   }
@@ -585,33 +642,34 @@ function adjustQuickRest(delta) {
   if (val < 0) val = 0;
   if (val > 600) val = 600;
   input.value = val;
-  if (activeWorkout) activeWorkout.restSeconds = val;
+  if (window.WorkoutState.activeWorkout) window.WorkoutState.activeWorkout.restSeconds = val;
+  window.WorkoutState.save();
 }
 
 function adjustTotalRounds(delta) {
-  if (!activeWorkout) return;
+  if (!window.WorkoutState.activeWorkout) return;
 
-  if (isWaitingForRest) {
+  if (window.WorkoutState.isWaitingForRest) {
     showToast(t('cannot_change_rounds'), 'info');
     return;
   }
-  if (isPaused) {
+  if (window.WorkoutState.isPaused) {
     showToast(t('resume_to_continue'), 'info');
     return;
   }
 
-  let newTotal = activeWorkout.totalSets + delta;
+  let newTotal = window.WorkoutState.activeWorkout.totalSets + delta;
   if (newTotal < 1) newTotal = 1;
   if (newTotal > 20) newTotal = 20;
 
-  if (newTotal === activeWorkout.totalSets) return;
+  if (newTotal === window.WorkoutState.activeWorkout.totalSets) return;
 
-  if (currentRound >= newTotal) {
+  if (window.WorkoutState.currentRound >= newTotal) {
     showToast(t('cannot_reduce_rounds'), 'info');
     return;
   }
 
-  activeWorkout.exercises.forEach(ex => {
+  window.WorkoutState.activeWorkout.exercises.forEach(ex => {
     const currentRounds = ex.rounds;
     if (newTotal > currentRounds.length) {
       for (let i = currentRounds.length; i < newTotal; i++) {
@@ -627,131 +685,127 @@ function adjustTotalRounds(delta) {
     }
   });
 
-  activeWorkout.totalSets = newTotal;
+  window.WorkoutState.activeWorkout.totalSets = newTotal;
 
   const totalRoundsSpan = document.getElementById('total-rounds');
-  if (totalRoundsSpan) totalRoundsSpan.textContent = activeWorkout.totalSets;
+  if (totalRoundsSpan) totalRoundsSpan.textContent = window.WorkoutState.activeWorkout.totalSets;
 
   renderActiveWorkout();
-  showToast(t('rounds_count') + ': ' + activeWorkout.totalSets, 'success');
+  showToast(t('rounds_count') + ': ' + window.WorkoutState.activeWorkout.totalSets, 'success');
+  window.WorkoutState.save();
 }
 
 function showConfirmModal(options) {
-    return new Promise((resolve) => {
-        const modal = document.getElementById('confirm-modal');
-        const titleEl = document.getElementById('modal-title');
-        const confirmBtn = document.getElementById('modal-confirm');
-        const cancelBtn = document.getElementById('modal-cancel');
+  return new Promise((resolve) => {
+    const modal = document.getElementById('confirm-modal');
+    const titleEl = document.getElementById('modal-title');
+    const confirmBtn = document.getElementById('modal-confirm');
+    const cancelBtn = document.getElementById('modal-cancel');
 
-        if (!modal) {
-            resolve(confirm(options.message || t('confirm_delete')));
-            return;
-        }
+    if (!modal) {
+      resolve(confirm(options.message || t('confirm_delete')));
+      return;
+    }
 
-        if (titleEl) titleEl.textContent = options.title || t('confirm_finish_workout');
+    if (titleEl) titleEl.textContent = options.title || t('confirm_finish_workout');
 
-        modal.classList.remove('hidden');
+    modal.classList.remove('hidden');
 
-        const handleConfirm = () => {
-            modal.classList.add('hidden');
-            cleanup();
-            resolve(true);
-        };
+    const handleConfirm = () => {
+      modal.classList.add('hidden');
+      cleanup();
+      resolve(true);
+    };
 
-        const handleCancel = () => {
-            modal.classList.add('hidden');
-            cleanup();
-            resolve(false);
-        };
+    const handleCancel = () => {
+      modal.classList.add('hidden');
+      cleanup();
+      resolve(false);
+    };
 
-        const cleanup = () => {
-            confirmBtn.removeEventListener('click', handleConfirm);
-            cancelBtn.removeEventListener('click', handleCancel);
-            modal.removeEventListener('click', handleOverlay);
-        };
+    const cleanup = () => {
+      confirmBtn.removeEventListener('click', handleConfirm);
+      cancelBtn.removeEventListener('click', handleCancel);
+      modal.removeEventListener('click', handleOverlay);
+    };
 
-        const handleOverlay = (e) => {
-            if (e.target === modal) {
-                handleCancel();
-            }
-        };
+    const handleOverlay = (e) => {
+      if (e.target === modal) {
+        handleCancel();
+      }
+    };
 
-        confirmBtn.addEventListener('click', handleConfirm);
-        cancelBtn.addEventListener('click', handleCancel);
-        modal.addEventListener('click', handleOverlay);
-    });
+    confirmBtn.addEventListener('click', handleConfirm);
+    cancelBtn.addEventListener('click', handleCancel);
+    modal.addEventListener('click', handleOverlay);
+  });
 }
 
 async function finishWorkout() {
-    if (!activeWorkout) return;
+  if (!window.WorkoutState.activeWorkout) return;
 
-    const isReadyToFinish = isLastRoundReady;
-    const allCompleted = activeWorkout.exercises.every(ex => ex.rounds[currentRound].completed);
-    const isLastRound = (currentRound + 1 === activeWorkout.totalSets);
+  const isReadyToFinish = window.WorkoutState.isLastRoundReady;
+  const allCompleted = window.WorkoutState.activeWorkout.exercises.every(ex => ex.rounds[window.WorkoutState.currentRound].completed);
+  const isLastRound = (window.WorkoutState.currentRound + 1 === window.WorkoutState.activeWorkout.totalSets);
 
-    if (isLastRound && !isReadyToFinish && !allCompleted) {
-        await showConfirmModal({
-            title: '❌ ' + t('cannot_finish'),
-            message: t('check_all_exercises_to_finish')
-        });
-        return;
-    }
-
-    const confirmed = await showConfirmModal({
-        title: '🏁 ' + t('confirm_finish_workout'),
-        message: ''
+  if (isLastRound && !isReadyToFinish && !allCompleted) {
+    await showConfirmModal({
+      title: '❌ ' + t('cannot_finish'),
+      message: t('check_all_exercises_to_finish')
     });
+    return;
+  }
 
-    if (!confirmed) return;
+  const confirmed = await showConfirmModal({
+    title: '🏁 ' + t('confirm_finish_workout'),
+    message: ''
+  });
 
-    stopSessionTimer();
-    stopRestTimer();
-    isWaitingForRest = false;
+  if (!confirmed) return;
 
-    const session = {
-        workoutId: activeWorkout.workoutId,
-        workoutName: activeWorkout.workoutName,
-        startTime: activeWorkout.startTime,
-        endTime: new Date().toISOString(),
-        duration: getSessionSeconds(),
-        totalSets: activeWorkout.totalSets,
-        exercises: activeWorkout.exercises.map(ex => ({
-            exerciseId: ex.exerciseId,
-            name: ex.name,
-            muscle: ex.muscle,
-            sets: ex.rounds
-        }))
-    };
+  stopSessionTimer();
+  stopRestTimer();
 
-    try {
-        await addSession(session);
-        showToast(t('workout_completed'), 'success');
-        playFinishSound();
-    } catch (e) {
-        showToast(t('error'), 'error');
-    }
+  const session = {
+    workoutId: window.WorkoutState.activeWorkout.workoutId,
+    workoutName: window.WorkoutState.activeWorkout.workoutName,
+    startTime: window.WorkoutState.activeWorkout.startTime,
+    endTime: new Date().toISOString(),
+    duration: getSessionSeconds(),
+    totalSets: window.WorkoutState.activeWorkout.totalSets,
+    exercises: window.WorkoutState.activeWorkout.exercises.map(ex => ({
+      exerciseId: ex.exerciseId,
+      name: ex.name,
+      muscle: ex.muscle,
+      sets: ex.rounds
+    }))
+  };
 
-    activeWorkout = null;
-    currentRound = 0;
-    isPaused = false;
-    savedRestSeconds = 0;
-    isWaitingForRest = false;
-    isLastRoundReady = false;
+  try {
+    await addSession(session);
+    showToast(t('workout_completed'), 'success');
+    playFinishSound();
+  } catch (e) {
+    showToast(t('error'), 'error');
+  }
 
-    const pauseOverlay = document.getElementById('pause-overlay');
-    if (pauseOverlay) pauseOverlay.classList.add('hidden');
+  window.WorkoutState.reset();
+  window.WorkoutState.save(); // usuwa autosave
 
-    const finishBtn = document.getElementById('btn-finish-workout');
-    if (finishBtn) {
-        finishBtn.classList.remove('ready-to-finish');
-        finishBtn.style.background = '';
-        finishBtn.style.border = '';
-        finishBtn.style.color = '';
-    }
+  const pauseOverlay = document.getElementById('pause-overlay');
+  if (pauseOverlay) pauseOverlay.classList.add('hidden');
 
-    renderWorkoutsList();
-    renderHistoryList();
-    showScreen('screen-home', 'GymTracker Pro');
+  const finishBtn = document.getElementById('btn-finish-workout');
+  if (finishBtn) {
+    finishBtn.classList.remove('ready-to-finish');
+    finishBtn.style.background = '';
+    finishBtn.style.border = '';
+    finishBtn.style.color = '';
+  }
+
+  renderWorkoutsList();
+  renderHistoryList();
+  showScreen('screen-home', 'GymTracker Pro');
 }
 
 // --- HISTORY ---
@@ -855,13 +909,24 @@ async function renderStatsExerciseSelect() {
   const select = document.getElementById('stats-exercise-select');
   if (!select) return;
   const exercises = await getAllExercises();
-  select.innerHTML = '<option value="">' + t('select_exercise') + '</option>';
-  exercises.forEach(ex => {
-    const opt = document.createElement('option');
-    opt.value = ex.id;
-    opt.textContent = ex.name;
-    select.appendChild(opt);
-  });
+  select.innerHTML = '';
+	  if (exercises.length === 0) {
+	  const option = document.createElement('option');
+	  option.value = '';
+	  option.textContent = t('no_data_add_exercise');
+	  select.appendChild(option);
+	} else {
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = t('select_exercise');
+    select.appendChild(defaultOption);
+    exercises.forEach(ex => {
+      const opt = document.createElement('option');
+      opt.value = ex.id;
+      opt.textContent = ex.name;
+      select.appendChild(opt);
+    });
+  }
 }
 
 // --- NUMBER INPUT HELPERS ---
