@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gymtracker-v1.1.0';
+const CACHE_NAME = 'gymtracker-v1.0.0';
 const urlsToCache = [
   './',
   './index.html',
@@ -52,11 +52,13 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(event.request)
         .then(response => {
-          // Jeśli udało się pobrać z sieci, zaktualizuj cache
+          // Zapisuj do cache tylko żądania HTTP/HTTPS (pomija np. chrome-extension://)
           const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, copy);
-          });
+          if (event.request.url.startsWith('http')) {
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, copy);
+            });
+          }
           return response;
         })
         .catch(async () => {
@@ -105,28 +107,6 @@ async function periodicSync() {
   const cache = await caches.open(CACHE_NAME);
   await cache.addAll(urlsToCache);
 }
-
-// ==========================
-// PUSH NOTIFICATIONS
-// ==========================
-self.addEventListener('push', event => {
-  const data = event.data ? event.data.json() : {};
-  const title = data.title || 'GymTracker';
-  const options = {
-    body: data.body || 'Nowe powiadomienie',
-    icon: './icons/icon-192.png',
-    badge: './icons/icon-192.png',
-    data: data.url || './'
-  };
-  event.waitUntil(self.registration.showNotification(title, options));
-});
-
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-  event.waitUntil(
-    clients.openWindow(event.notification.data || './')
-  );
-});
 
 // ==========================
 // MESSAGE HANDLER (for update notification)
