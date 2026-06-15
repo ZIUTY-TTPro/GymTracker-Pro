@@ -3,7 +3,7 @@
   "name": "GymTracker Pro",
   "short_name": "GymTracker",
   "description": "Profesjonalny tracker treningów siłowych",
-  "start_url": "./?v=20260612",
+  "start_url": "./",
   "scope": "./",
   "prefer_related_applications": false,
   "display": "standalone",
