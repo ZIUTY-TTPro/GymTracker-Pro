@@ -15,7 +15,6 @@ function renderStatsChart(type, data, labels, label) {
   const textColor = isDark ? '#a0a0b0' : '#636e72';
   const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
   const primaryColor = '#e94560';
-  const secondaryColor = '#0f3460';
 
   const datasets = [];
 
@@ -174,7 +173,7 @@ function renderMeasurementsChart(measurements) {
   });
 }
 
-// --- STATS SUMMARY ---
+// --- STATS SUMMARY (LEPSZY KOMUNIKAT) ---
 function renderStatsSummary(data, type) {
   const container = document.getElementById('stats-summary');
   if (!container) return;
@@ -182,7 +181,7 @@ function renderStatsSummary(data, type) {
   container.innerHTML = '';
 
   if (!data || data.length === 0) {
-    container.innerHTML = '<div class="stat-box"><div class="stat-value">-</div><div class="stat-label">' + t('no_data') + '</div></div>';
+    container.innerHTML = '<div class="stat-box" style="grid-column: span 2;"><div class="stat-value">-</div><div class="stat-label">' + t('no_data') + '</div><div class="stat-label" style="font-size:0.7rem;">' + t('perform_workout_to_see_stats') + '</div></div>';
     return;
   }
 
@@ -214,7 +213,6 @@ function renderStatsSummary(data, type) {
   }
 }
 
-// --- UPDATE CHART THEME ---
 function updateChartTheme() {
   if (mainChart) {
     const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
