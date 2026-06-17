@@ -31,7 +31,7 @@ function showScreen(screenId, title = null) {
   });
 
   const bottomNav = document.getElementById('bottom-nav');
-  const hideNavScreens = ['screen-exercise-form', 'screen-workout-form', 'screen-active-workout'];
+  const hideNavScreens = ['screen-exercise-form', 'screen-workout-form', 'screen-active-workout', 'screen-activity-workout'];
   if (bottomNav) bottomNav.classList.toggle('hidden', hideNavScreens.includes(screenId));
 
   const backBtn = document.getElementById('btn-back');
@@ -41,6 +41,10 @@ function showScreen(screenId, title = null) {
 
   const main = document.getElementById('main');
   if (main) main.scrollTop = 0;
+
+  if (screenId === 'screen-history') {
+    renderHistoryList();
+  }
 }
 
 // --- EXERCISES LIST ---
@@ -58,10 +62,16 @@ async function renderExercisesList() {
   exercises.forEach(ex => {
     const card = document.createElement('div');
     card.className = 'card';
+    const isActivity = ex.type === 'activity';
+    const icon = isActivity ? '🏃 ' : '';
+    const details = isActivity 
+      ? (ex.note ? '📝 ' + escapeHtml(ex.note) : t('activity'))
+      : `${escapeHtml(t(MUSCLE_GROUP_MAP[ex.muscle]) || ex.muscle)} • ${ex.weight || 0}kg • ${ex.reps || 8} ${t('reps').toLowerCase()}`;
+    
     card.innerHTML = `
       <div class="card-info">
-        <h3>${escapeHtml(ex.name)}</h3>
-        <p>${escapeHtml(t(MUSCLE_GROUP_MAP[ex.muscle]) || ex.muscle)} • ${ex.weight || 0}kg • ${ex.reps || 8} ${t('reps').toLowerCase()}</p>
+        <h3>${icon}${escapeHtml(ex.name)}</h3>
+        <p>${details}</p>
       </div>
       <div class="card-actions">
         <button class="card-btn edit" data-id="${ex.id}" title="${t('edit')}">✎</button>
@@ -87,13 +97,19 @@ async function renderWorkoutsList() {
   }
 
   workouts.forEach(wo => {
+    const isActivity = wo.type === 'activity';
     const exCount = wo.exercises ? wo.exercises.length : 0;
+    const icon = isActivity ? '🏃 ' : '';
+    const details = isActivity 
+      ? `${t('activity')}`
+      : `${exCount} ${t('exercise').toLowerCase()} • ${wo.sets || 4} ${t('sets').toLowerCase()} • ${wo.rest || 90}s ${t('rest_timer').toLowerCase()}`;
+    
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML = `
       <div class="card-info">
-        <h3>${escapeHtml(wo.name)}</h3>
-        <p>${exCount} ${t('exercise').toLowerCase()} • ${wo.sets || 4} ${t('sets').toLowerCase()} • ${wo.rest || 90}s ${t('rest_timer').toLowerCase()}</p>
+        <h3>${icon}${escapeHtml(wo.name)}</h3>
+        <p>${details}</p>
       </div>
       <div class="card-actions">
         <button class="card-btn play" data-id="${wo.id}" title="${t('start')}">▶</button>
@@ -114,9 +130,20 @@ function editExercise(id) {
     if (!ex) return;
     document.getElementById('ex-id').value = ex.id;
     document.getElementById('ex-name').value = ex.name || '';
-    document.getElementById('ex-muscle').value = ex.muscle || 'Klatka piersiowa';
-    document.getElementById('ex-weight').value = ex.weight || 20;
-    document.getElementById('ex-reps').value = ex.reps || 8;
+    document.getElementById('ex-type').value = ex.type || 'strength';
+    
+    if (ex.type === 'activity') {
+      document.getElementById('ex-strength-fields').style.display = 'none';
+      document.getElementById('ex-activity-fields').style.display = 'block';
+      document.getElementById('ex-measure-duration').checked = ex.measureDuration !== false;
+      document.getElementById('ex-activity-note').value = ex.note || '';
+    } else {
+      document.getElementById('ex-strength-fields').style.display = 'block';
+      document.getElementById('ex-activity-fields').style.display = 'none';
+      document.getElementById('ex-muscle').value = ex.muscle || 'Klatka piersiowa';
+      document.getElementById('ex-weight').value = ex.weight || 20;
+      document.getElementById('ex-reps').value = ex.reps || 8;
+    }
     showScreen('screen-exercise-form', t('define_exercise'));
   });
 }
@@ -124,8 +151,14 @@ function editExercise(id) {
 function resetExerciseForm() {
   document.getElementById('exercise-form').reset();
   document.getElementById('ex-id').value = '';
+  document.getElementById('ex-type').value = '';
+  document.getElementById('ex-muscle').value = '';
+  document.getElementById('ex-strength-fields').style.display = 'block';
+  document.getElementById('ex-activity-fields').style.display = 'none';
   document.getElementById('ex-weight').value = 20;
   document.getElementById('ex-reps').value = 8;
+  document.getElementById('ex-measure-duration').checked = true;
+  document.getElementById('ex-activity-note').value = '';
 }
 
 async function deleteExerciseItem(id) {
@@ -144,14 +177,15 @@ async function renderWorkoutExercisesSelect() {
   const container = document.getElementById('wo-exercises-select');
   if (!container) return;
   const exercises = await getAllExercises();
+  const strengthExercises = exercises.filter(ex => ex.type !== 'activity');
   container.innerHTML = '';
 
-  if (exercises.length === 0) {
-    container.innerHTML = '<p style="padding:14px;color:var(--text-secondary);">' + t('no_data') + '</p>';
+  if (strengthExercises.length === 0) {
+    container.innerHTML = '<p style="padding:14px;color:var(--text-secondary);">' + t('no_data_add_exercise') + '</p>';
     return;
   }
 
-  exercises.forEach(ex => {
+  strengthExercises.forEach(ex => {
     const item = document.createElement('div');
     item.className = 'exercise-select-item';
     
@@ -177,34 +211,120 @@ async function renderWorkoutExercisesSelect() {
   });
 }
 
+async function renderWorkoutActivitySelect() {
+  const container = document.getElementById('wo-activity-select');
+  if (!container) return;
+  const exercises = await getAllExercises();
+  const activities = exercises.filter(ex => ex.type === 'activity');
+  container.innerHTML = '';
+
+  if (activities.length === 0) {
+    container.innerHTML = '<p style="padding:14px;color:var(--text-secondary);">' + t('no_data_add_exercise') + '</p>';
+    return;
+  }
+
+  activities.forEach(ex => {
+    const item = document.createElement('div');
+    item.className = 'exercise-select-item';
+    
+    item.innerHTML = `
+      <div class="ex-info">
+        <h4>🏃 ${escapeHtml(ex.name)}</h4>
+        <p>${ex.note ? '📝 ' + escapeHtml(ex.note) : ''}</p>
+      </div>
+      <div class="check-circle"></div>
+      <input type="checkbox" value="${ex.id}" data-name="${escapeHtml(ex.name)}">
+    `;
+    
+    const checkbox = item.querySelector('input[type="checkbox"]');
+    const checkCircle = item.querySelector('.check-circle');
+    
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) {
+        document.querySelectorAll('#wo-activity-select input[type="checkbox"]').forEach(cb => {
+          if (cb !== checkbox) cb.checked = false;
+        });
+        document.querySelectorAll('#wo-activity-select .exercise-select-item').forEach(el => {
+          el.classList.toggle('selected', el.querySelector('input').checked);
+        });
+      }
+    });
+    
+    checkCircle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      checkbox.checked = !checkbox.checked;
+      if (checkbox.checked) {
+        document.querySelectorAll('#wo-activity-select input[type="checkbox"]').forEach(cb => {
+          if (cb !== checkbox) cb.checked = false;
+        });
+      }
+      document.querySelectorAll('#wo-activity-select .exercise-select-item').forEach(el => {
+        el.classList.toggle('selected', el.querySelector('input').checked);
+      });
+    });
+    
+    container.appendChild(item);
+  });
+}
+
 function editWorkout(id) {
   getWorkout(id).then(wo => {
     if (!wo) return;
     document.getElementById('wo-id').value = wo.id;
     document.getElementById('wo-name').value = wo.name || '';
-    document.getElementById('wo-sets').value = wo.sets || 4;
-    document.getElementById('wo-rest').value = wo.rest || 90;
-
-    renderWorkoutExercisesSelect().then(() => {
-      if (wo.exercises) {
-        document.querySelectorAll('#wo-exercises-select input[type="checkbox"]').forEach(cb => {
-          const val = parseInt(cb.value);
-          const isSelected = wo.exercises.includes(val);
-          cb.checked = isSelected;
-          cb.closest('.exercise-select-item').classList.toggle('selected', isSelected);
-        });
-      }
-      showScreen('screen-workout-form', t('define_workout'));
-    });
+    document.getElementById('wo-type').value = wo.type || 'strength';
+    
+    const isActivity = wo.type === 'activity';
+    document.getElementById('wo-strength-fields').style.display = isActivity ? 'none' : 'block';
+    document.getElementById('wo-activity-info').style.display = isActivity ? 'block' : 'none';
+    
+    if (isActivity) {
+      renderWorkoutActivitySelect().then(() => {
+        if (wo.exercises && wo.exercises.length > 0) {
+          document.querySelectorAll('#wo-activity-select input[type="checkbox"]').forEach(cb => {
+            const val = parseInt(cb.value);
+            const isSelected = wo.exercises.includes(val);
+            cb.checked = isSelected;
+            cb.closest('.exercise-select-item').classList.toggle('selected', isSelected);
+          });
+        }
+        showScreen('screen-workout-form', t('define_workout'));
+      });
+    } else {
+      document.getElementById('wo-sets').value = wo.sets || 4;
+      document.getElementById('wo-rest').value = wo.rest || 90;
+      renderWorkoutExercisesSelect().then(() => {
+        if (wo.exercises) {
+          document.querySelectorAll('#wo-exercises-select input[type="checkbox"]').forEach(cb => {
+            const val = parseInt(cb.value);
+            const isSelected = wo.exercises.includes(val);
+            cb.checked = isSelected;
+            cb.closest('.exercise-select-item').classList.toggle('selected', isSelected);
+          });
+        }
+        showScreen('screen-workout-form', t('define_workout'));
+      });
+    }
   });
 }
 
 function resetWorkoutForm() {
   document.getElementById('workout-form').reset();
   document.getElementById('wo-id').value = '';
+  document.getElementById('wo-type').value = '';
+  const typeSelect = document.getElementById('wo-type-select');
+  if (typeSelect) typeSelect.value = '';
   document.getElementById('wo-sets').value = 4;
   document.getElementById('wo-rest').value = 90;
+  document.getElementById('wo-strength-fields').style.display = 'block';
+  document.getElementById('wo-exercises-select').style.display = 'block';
+  document.getElementById('wo-activity-select').style.display = 'none';
+  document.getElementById('wo-activity-hint').style.display = 'none';
   document.querySelectorAll('#wo-exercises-select .exercise-select-item').forEach(item => {
+    item.classList.remove('selected');
+    item.querySelector('input').checked = false;
+  });
+  document.querySelectorAll('#wo-activity-select .exercise-select-item').forEach(item => {
     item.classList.remove('selected');
     item.querySelector('input').checked = false;
   });
@@ -277,13 +397,167 @@ window.WorkoutState = {
 };
 
 // ============================================
-// LOGIKA AKTYWNEGO TRENINGU
+// AKTYWNOŚCI OGÓLNE - STAN
+// ============================================
+
+window.ActivityState = {
+  activeActivity: null,
+  startTime: null,
+  timerInterval: null,
+  seconds: 0
+};
+
+function resetActivityState() {
+  window.ActivityState.activeActivity = null;
+  window.ActivityState.startTime = null;
+  if (window.ActivityState.timerInterval) {
+    clearInterval(window.ActivityState.timerInterval);
+    window.ActivityState.timerInterval = null;
+  }
+  window.ActivityState.seconds = 0;
+}
+
+// ============================================
+// LOGIKA AKTYWNOŚCI
+// ============================================
+
+async function startActivity(workoutId) {
+  const workout = await getWorkout(workoutId);
+  if (!workout || !workout.exercises || workout.exercises.length === 0) {
+    showToast(t('no_exercises_selected'), 'error');
+    return;
+  }
+
+  const exercise = await getExercise(workout.exercises[0]);
+  if (!exercise) {
+    showToast(t('error'), 'error');
+    return;
+  }
+
+  resetActivityState();
+
+  window.ActivityState.activeActivity = {
+    workoutId: workout.id,
+    workoutName: workout.name,
+    exerciseId: exercise.id,
+    exerciseName: exercise.name,
+    measureDuration: exercise.measureDuration !== false,
+    note: '',
+    startTime: new Date().toISOString()
+  };
+
+  document.getElementById('activity-name').textContent = exercise.name;
+  document.getElementById('activity-timer').textContent = '0:00';
+  document.getElementById('activity-note-input').value = '';
+
+  showScreen('screen-activity-workout', exercise.name);
+  showToast(t('activity_started'), 'success');
+
+  if (window.ActivityState.activeActivity.measureDuration) {
+    startActivityTimer();
+  }
+
+  document.getElementById('activity-note-input').addEventListener('input', (e) => {
+    if (window.ActivityState.activeActivity) {
+      window.ActivityState.activeActivity.note = e.target.value;
+    }
+  });
+}
+
+function startActivityTimer() {
+  window.ActivityState.startTime = Date.now();
+  window.ActivityState.seconds = 0;
+
+  if (window.ActivityState.timerInterval) {
+    clearInterval(window.ActivityState.timerInterval);
+  }
+
+  window.ActivityState.timerInterval = setInterval(() => {
+    window.ActivityState.seconds = Math.floor((Date.now() - window.ActivityState.startTime) / 1000);
+    const timerEl = document.getElementById('activity-timer');
+    if (timerEl) {
+      timerEl.textContent = formatTime(window.ActivityState.seconds);
+    }
+  }, 1000);
+}
+
+function stopActivityTimer() {
+  if (window.ActivityState.timerInterval) {
+    clearInterval(window.ActivityState.timerInterval);
+    window.ActivityState.timerInterval = null;
+  }
+}
+
+async function finishActivity() {
+  if (!window.ActivityState.activeActivity) return;
+
+  const confirmed = await showConfirmModal({
+    title: '🏃 ' + t('finish_activity'),
+    message: ''
+  });
+
+  if (!confirmed) return;
+
+  stopActivityTimer();
+
+  const session = {
+    workoutId: window.ActivityState.activeActivity.workoutId,
+    workoutName: window.ActivityState.activeActivity.workoutName,
+    type: 'activity',
+    startTime: window.ActivityState.activeActivity.startTime,
+    endTime: new Date().toISOString(),
+    duration: window.ActivityState.seconds,
+    date: new Date().toLocaleDateString('fr-CA'),
+    exercises: [{
+      exerciseId: window.ActivityState.activeActivity.exerciseId,
+      name: window.ActivityState.activeActivity.exerciseName,
+      type: 'activity',
+      duration: window.ActivityState.seconds,
+      note: window.ActivityState.activeActivity.note || '',
+      completed: true
+    }]
+  };
+
+  try {
+    await addSession(session);
+    showToast(t('activity_completed'), 'success');
+    playFinishSound();
+  } catch (e) {
+    showToast(t('error'), 'error');
+  }
+
+  resetActivityState();
+  renderWorkoutsList();
+  renderHistoryList();
+  showScreen('screen-home', 'GymTracker Pro');
+}
+
+function cancelActivity() {
+  if (!window.ActivityState.activeActivity) return;
+
+  const confirmed = confirm(t('confirm_delete'));
+  if (!confirmed) return;
+
+  stopActivityTimer();
+  resetActivityState();
+  showScreen('screen-home', 'GymTracker Pro');
+}
+
+// ============================================
+// LOGIKA AKTYWNEGO TRENINGU SIŁOWEGO
 // ============================================
 
 async function startWorkout(workoutId) {
   const workout = await getWorkout(workoutId);
   if (!workout || !workout.exercises || workout.exercises.length === 0) {
     showToast(t('no_exercises_selected'), 'error');
+    return;
+  }
+
+  // Sprawdź czy to aktywność
+  const firstExercise = await getExercise(workout.exercises[0]);
+  if (firstExercise && firstExercise.type === 'activity') {
+    startActivity(workoutId);
     return;
   }
 
@@ -769,14 +1043,17 @@ async function finishWorkout() {
   const session = {
     workoutId: window.WorkoutState.activeWorkout.workoutId,
     workoutName: window.WorkoutState.activeWorkout.workoutName,
+    type: 'strength',
     startTime: window.WorkoutState.activeWorkout.startTime,
     endTime: new Date().toISOString(),
     duration: getSessionSeconds(),
     totalSets: window.WorkoutState.activeWorkout.totalSets,
+    date: new Date().toLocaleDateString('fr-CA'),
     exercises: window.WorkoutState.activeWorkout.exercises.map(ex => ({
       exerciseId: ex.exerciseId,
       name: ex.name,
       muscle: ex.muscle,
+      type: 'strength',
       sets: ex.rounds
     }))
   };
@@ -790,7 +1067,7 @@ async function finishWorkout() {
   }
 
   window.WorkoutState.reset();
-  window.WorkoutState.save(); // usuwa autosave
+  window.WorkoutState.save();
 
   const pauseOverlay = document.getElementById('pause-overlay');
   if (pauseOverlay) pauseOverlay.classList.add('hidden');
@@ -806,60 +1083,6 @@ async function finishWorkout() {
   renderWorkoutsList();
   renderHistoryList();
   showScreen('screen-home', 'GymTracker Pro');
-}
-
-// --- HISTORY ---
-async function renderHistoryList() {
-  const container = document.getElementById('history-list');
-  if (!container) return;
-  const sessions = await getAllSessions();
-  container.innerHTML = '';
-
-  if (sessions.length === 0) {
-    container.innerHTML = '<div class="history-item"><p>' + t('no_history') + '</p></div>';
-    return;
-  }
-
-  const sorted = sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-  sorted.forEach(session => {
-    const date = new Date(session.date);
-    const dateStr = date.toLocaleDateString('pl-PL');
-    const duration = session.duration ? formatTime(session.duration) : '-';
-
-    let completedSets = 0;
-    let totalSets = 0;
-
-    if (session.exercises) {
-      session.exercises.forEach(ex => {
-        if (ex.sets) {
-          totalSets += ex.sets.length;
-          completedSets += ex.sets.filter(s => s.completed).length;
-        }
-      });
-    }
-
-    const detail = document.createElement('div');
-    detail.className = 'history-detail';
-    detail.innerHTML = `
-      <h3>${escapeHtml(session.workoutName || t('workout_history'))}</h3>
-      <div class="meta">${dateStr} • ${duration} • ${completedSets}/${totalSets} ${t('sets').toLowerCase()}</div>
-      <div class="exercises-summary">
-        ${(session.exercises || []).map(ex => `
-          <div class="history-exercise">
-            <h4>${escapeHtml(ex.name)}</h4>
-            <div class="sets-summary">
-              ${(ex.sets || []).map(s => 
-                s.completed ? `<span>${s.weight}kg x${s.reps}</span>` : 
-                `<span style="opacity:0.3">-</span>`
-              ).join('')}
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    `;
-    container.appendChild(detail);
-  });
 }
 
 // --- MEASUREMENTS ---
@@ -909,18 +1132,19 @@ async function renderStatsExerciseSelect() {
   const select = document.getElementById('stats-exercise-select');
   if (!select) return;
   const exercises = await getAllExercises();
+  const strengthExercises = exercises.filter(ex => ex.type !== 'activity');
   select.innerHTML = '';
-	  if (exercises.length === 0) {
-	  const option = document.createElement('option');
-	  option.value = '';
-	  option.textContent = t('no_data_add_exercise');
-	  select.appendChild(option);
-	} else {
+  if (strengthExercises.length === 0) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = t('no_data_add_exercise');
+    select.appendChild(option);
+  } else {
     const defaultOption = document.createElement('option');
     defaultOption.value = '';
     defaultOption.textContent = t('select_exercise');
     select.appendChild(defaultOption);
-    exercises.forEach(ex => {
+    strengthExercises.forEach(ex => {
       const opt = document.createElement('option');
       opt.value = ex.id;
       opt.textContent = ex.name;
@@ -947,3 +1171,300 @@ function adjustValue(inputId, delta) {
 function adjustActiveValue(inputId, delta) {
   adjustValue(inputId, delta);
 }
+
+// ============================================
+// KALENDARZ HISTORII
+// ============================================
+
+let currentCalendarYear = new Date().getFullYear();
+let currentCalendarMonth = new Date().getMonth();
+let sessionsData = {};
+
+async function loadSessionsData() {
+  const sessions = await getAllSessions();
+  sessionsData = {};
+  sessions.forEach(session => {
+    const dateKey = session.date.split('T')[0];
+    if (!sessionsData[dateKey]) sessionsData[dateKey] = [];
+    sessionsData[dateKey].push(session);
+  });
+}
+
+function getMuscleColor(muscle) {
+  const map = {
+    'Klatka piersiowa': '#e94560',
+    'Plecy': '#3498db',
+    'Barki': '#f1c40f',
+    'Biceps': '#e67e22',
+    'Triceps': '#2ecc71',
+    'Nogi': '#9b59b6',
+    'Brzuch': '#1abc9c',
+    'Inne': '#95a5a6'
+  };
+  return map[muscle] || '#95a5a6';
+}
+
+function renderCalendar(year, month) {
+  const grid = document.getElementById('calendar-grid');
+  const monthYear = document.getElementById('calendar-month-year');
+  if (!grid || !monthYear) return;
+
+  const lang = localStorage.getItem('gym-lang') || 'pl';
+  const months = translations[lang]?.months || translations['pl'].months;
+  const weekdaysShort = translations[lang]?.weekdays_short || translations['pl'].weekdays_short;
+
+  const date = new Date(year, month);
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  // Przetłumaczona nazwa miesiąca i roku
+  const monthNames = Object.values(months);
+  monthYear.textContent = `${monthNames[month]} ${year}`;
+
+  // Przetłumaczone dni tygodnia
+  const weekdaysEl = document.querySelector('.calendar-weekdays');
+  if (weekdaysEl) {
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    weekdaysEl.innerHTML = days.map(d => `<span>${weekdaysShort[d]}</span>`).join('');
+  }
+
+  let startOffset = (firstDay === 0) ? 6 : firstDay - 1;
+  grid.innerHTML = '';
+
+  for (let i = 0; i < startOffset; i++) {
+    const empty = document.createElement('div');
+    empty.className = 'calendar-day other-month';
+    grid.appendChild(empty);
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const isToday = dateStr === todayStr;
+
+    const dayDiv = document.createElement('div');
+    dayDiv.className = 'calendar-day';
+    if (isToday) dayDiv.classList.add('today');
+
+    const sessions = sessionsData[dateStr] || [];
+    if (sessions.length > 0) {
+      dayDiv.classList.add('has-workout');
+    }
+
+    const numberSpan = document.createElement('span');
+    numberSpan.className = 'day-number';
+    numberSpan.textContent = day;
+    dayDiv.appendChild(numberSpan);
+
+    if (sessions.length > 0) {
+      const dotsContainer = document.createElement('div');
+      dotsContainer.className = 'day-dots';
+      
+      const hasActivity = sessions.some(s => s.type === 'activity');
+      
+      if (hasActivity) {
+        const icon = document.createElement('span');
+        icon.className = 'activity-icon-small';
+        icon.textContent = '🏃';
+        dotsContainer.appendChild(icon);
+      }
+      
+      const muscleSet = new Set();
+      sessions.forEach(session => {
+        if (session.type === 'activity') return;
+        if (session.exercises) {
+          session.exercises.forEach(ex => {
+            if (ex.muscle) muscleSet.add(ex.muscle);
+          });
+        }
+      });
+      
+      muscleSet.forEach(muscle => {
+        const dot = document.createElement('span');
+        dot.className = 'dot';
+        dot.style.backgroundColor = getMuscleColor(muscle);
+        dotsContainer.appendChild(dot);
+      });
+      
+      dayDiv.appendChild(dotsContainer);
+    }
+
+    if (sessions.length > 0) {
+      dayDiv.addEventListener('click', () => showDayDetails(dateStr));
+    }
+
+    grid.appendChild(dayDiv);
+  }
+
+  currentCalendarYear = year;
+  currentCalendarMonth = month;
+}
+
+async function showDayDetails(dateStr) {
+  const container = document.getElementById('day-details');
+  if (!container) return;
+
+  const lang = localStorage.getItem('gym-lang') || 'pl';
+  const weekdays = translations[lang]?.weekdays || translations['pl'].weekdays;
+  const months = translations[lang]?.months || translations['pl'].months;
+
+  const sessions = sessionsData[dateStr] || [];
+  if (sessions.length === 0) {
+    container.innerHTML = `<div class="no-workouts">${t('no_workouts_this_day')}</div>`;
+    return;
+  }
+
+  const dateObj = new Date(dateStr + 'T00:00:00');
+  const dayName = weekdays[['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][dateObj.getDay()]];
+  const monthName = Object.values(months)[dateObj.getMonth()];
+  const formattedDate = `${dayName}, ${dateObj.getDate()} ${monthName} ${dateObj.getFullYear()}`;
+
+  let html = `
+    <div class="detail-header">
+      <span class="detail-date">${formattedDate}</span>
+      <button class="detail-close" id="detail-close">×</button>
+    </div>
+  `;
+
+  sessions.forEach((session) => {
+    const isActivity = session.type === 'activity';
+    const duration = session.duration ? formatTime(session.duration) : '-';
+    
+    let totalSets = 0;
+    let completedSets = 0;
+    if (session.exercises && !isActivity) {
+      session.exercises.forEach(ex => {
+        if (ex.sets) {
+          totalSets += ex.sets.length;
+          completedSets += ex.sets.filter(s => s.completed).length;
+        }
+      });
+    }
+
+    html += `
+      <div class="detail-session">
+        <button class="delete-session-btn" data-session-id="${session.id}" title="${t('delete_session')}">🗑</button>
+        <h4>${isActivity ? '🏃 ' : ''}${escapeHtml(session.workoutName || 'Trening')}</h4>
+        <div class="session-meta">${duration} ${!isActivity ? `• ${completedSets}/${totalSets} ${t('sets').toLowerCase()}` : ''}</div>
+    `;
+
+    if (session.exercises) {
+      session.exercises.forEach(ex => {
+        if (ex.type === 'activity') {
+          html += `<div class="session-exercise">🏃 <strong>${escapeHtml(ex.name)}</strong> 
+            <span class="set-info">${ex.duration ? formatTime(ex.duration) : t('no_duration')}</span>
+            ${ex.note ? ' 📝 ' + escapeHtml(ex.note) : ''}
+          </div>`;
+        } else {
+          const setsStr = (ex.sets || [])
+            .filter(s => s.completed)
+            .map(s => `${s.weight}kg × ${s.reps}`)
+            .join(', ');
+          if (setsStr) {
+            html += `<div class="session-exercise"><strong>${escapeHtml(ex.name)}</strong> <span class="set-info">${setsStr}</span></div>`;
+          }
+        }
+      });
+    }
+
+    html += `</div>`;
+  });
+
+  container.innerHTML = html;
+
+  document.getElementById('detail-close')?.addEventListener('click', () => {
+    container.innerHTML = '';
+  });
+
+  document.querySelectorAll('.delete-session-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const sessionId = parseInt(btn.dataset.sessionId);
+      if (confirm(t('confirm_delete_session'))) {
+        try {
+          await deleteSession(sessionId);
+          showToast(t('session_deleted'), 'success');
+          await loadSessionsData();
+          renderCalendar(currentCalendarYear, currentCalendarMonth);
+          const details = document.getElementById('day-details');
+          if (details) details.innerHTML = '';
+        } catch (err) {
+          showToast(t('error'), 'error');
+        }
+      }
+    });
+  });
+}
+
+function initCalendarNavigation() {
+  document.getElementById('calendar-prev')?.addEventListener('click', () => {
+    if (currentCalendarMonth === 0) {
+      currentCalendarMonth = 11;
+      currentCalendarYear--;
+    } else {
+      currentCalendarMonth--;
+    }
+    renderCalendar(currentCalendarYear, currentCalendarMonth);
+  });
+
+  document.getElementById('calendar-next')?.addEventListener('click', () => {
+    if (currentCalendarMonth === 11) {
+      currentCalendarMonth = 0;
+      currentCalendarYear++;
+    } else {
+      currentCalendarMonth++;
+    }
+    renderCalendar(currentCalendarYear, currentCalendarMonth);
+  });
+}
+// ============================================
+// ZWIJANA BIBLIOTEKA ĆWICZEŃ
+// ============================================
+
+function toggleExercisesList() {
+  const list = document.getElementById('exercises-list');
+  const btn = document.getElementById('btn-toggle-exercises');
+  if (!list || !btn) return;
+
+  const isCollapsed = list.classList.toggle('collapsed');
+  
+  // Zapamiętaj stan w localStorage
+  localStorage.setItem('gym-exercises-collapsed', isCollapsed ? 'true' : 'false');
+  
+  // Zmień tekst przycisku
+  if (isCollapsed) {
+    btn.textContent = t('show_exercises');
+    btn.setAttribute('data-key', 'show_exercises');
+  } else {
+    btn.textContent = t('hide_exercises');
+    btn.setAttribute('data-key', 'hide_exercises');
+  }
+}
+
+function initExercisesToggle() {
+  const btn = document.getElementById('btn-toggle-exercises');
+  const list = document.getElementById('exercises-list');
+  if (!btn || !list) return;
+
+  // Odczytaj stan z localStorage
+  const isCollapsed = localStorage.getItem('gym-exercises-collapsed') === 'true';
+  
+  if (isCollapsed) {
+    list.classList.add('collapsed');
+    btn.textContent = t('show_exercises');
+    btn.setAttribute('data-key', 'show_exercises');
+  } else {
+    list.classList.remove('collapsed');
+    btn.textContent = t('hide_exercises');
+    btn.setAttribute('data-key', 'hide_exercises');
+  }
+
+  // Nasłuchiwacz kliknięcia
+  btn.addEventListener('click', toggleExercisesList);
+}
+window.renderHistoryList = async function() {
+  await loadSessionsData();
+  renderCalendar(currentCalendarYear, currentCalendarMonth);
+  initCalendarNavigation();
+};
