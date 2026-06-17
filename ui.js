@@ -274,16 +274,13 @@ function editWorkout(id) {
     document.getElementById('wo-name').value = wo.name || '';
     document.getElementById('wo-type').value = wo.type || 'strength';
     
-    // Ustaw select typu
     const typeSelect = document.getElementById('wo-type-select');
     if (typeSelect) typeSelect.value = wo.type || 'strength';
     
     const isActivity = wo.type === 'activity';
     
-    // Pokaż/ukryj odpowiednie sekcje
     document.getElementById('wo-strength-fields').style.display = isActivity ? 'none' : 'block';
     
-    // Dla aktywności – pokaż komunikat i listę aktywności
     const hint = document.getElementById('wo-activity-hint');
     if (hint) {
       hint.style.display = isActivity ? 'block' : 'none';
@@ -292,7 +289,6 @@ function editWorkout(id) {
       }
     }
     
-    // Pokaż/ukryj listy ćwiczeń
     document.getElementById('wo-exercises-select').style.display = isActivity ? 'none' : 'block';
     document.getElementById('wo-activity-select').style.display = isActivity ? 'block' : 'none';
     
@@ -572,7 +568,6 @@ async function startWorkout(workoutId) {
     return;
   }
 
-  // Sprawdź czy to aktywność
   const firstExercise = await getExercise(workout.exercises[0]);
   if (firstExercise && firstExercise.type === 'activity') {
     startActivity(workoutId);
@@ -1152,22 +1147,35 @@ async function renderStatsExerciseSelect() {
   const exercises = await getAllExercises();
   const strengthExercises = exercises.filter(ex => ex.type !== 'activity');
   select.innerHTML = '';
+  
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = t('select_exercise');
+  select.appendChild(defaultOption);
+  
   if (strengthExercises.length === 0) {
-    const option = document.createElement('option');
-    option.value = '';
-    option.textContent = t('no_data_add_exercise');
-    select.appendChild(option);
+    const noData = document.createElement('option');
+    noData.value = '';
+    noData.textContent = t('no_data_add_exercise');
+    select.appendChild(noData);
   } else {
-    const defaultOption = document.createElement('option');
-    defaultOption.value = '';
-    defaultOption.textContent = t('select_exercise');
-    select.appendChild(defaultOption);
     strengthExercises.forEach(ex => {
       const opt = document.createElement('option');
       opt.value = ex.id;
       opt.textContent = ex.name;
       select.appendChild(opt);
     });
+  }
+  
+  // ZAWSZE ustaw wartość na pustą
+  select.value = '';
+  
+  // Wyczyść statystyki
+  if (typeof renderStatsChart === 'function') {
+    renderStatsChart('weight-chart', [], [], t('select_exercise'));
+  }
+  if (typeof renderStatsSummary === 'function') {
+    renderStatsSummary([], 'weight-chart');
   }
 }
 
@@ -1237,11 +1245,9 @@ function renderCalendar(year, month) {
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-  // Przetłumaczona nazwa miesiąca i roku
   const monthNames = Object.values(months);
   monthYear.textContent = `${monthNames[month]} ${year}`;
 
-  // Przetłumaczone dni tygodnia
   const weekdaysEl = document.querySelector('.calendar-weekdays');
   if (weekdaysEl) {
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -1436,6 +1442,13 @@ function initCalendarNavigation() {
     renderCalendar(currentCalendarYear, currentCalendarMonth);
   });
 }
+
+window.renderHistoryList = async function() {
+  await loadSessionsData();
+  renderCalendar(currentCalendarYear, currentCalendarMonth);
+  initCalendarNavigation();
+};
+
 // ============================================
 // ZWIJANA BIBLIOTEKA ĆWICZEŃ
 // ============================================
@@ -1447,10 +1460,8 @@ function toggleExercisesList() {
 
   const isCollapsed = list.classList.toggle('collapsed');
   
-  // Zapamiętaj stan w localStorage
   localStorage.setItem('gym-exercises-collapsed', isCollapsed ? 'true' : 'false');
   
-  // Zmień tekst przycisku
   if (isCollapsed) {
     btn.textContent = t('show_exercises');
     btn.setAttribute('data-key', 'show_exercises');
@@ -1465,7 +1476,6 @@ function initExercisesToggle() {
   const list = document.getElementById('exercises-list');
   if (!btn || !list) return;
 
-  // Odczytaj stan z localStorage
   const isCollapsed = localStorage.getItem('gym-exercises-collapsed') === 'true';
   
   if (isCollapsed) {
@@ -1478,11 +1488,420 @@ function initExercisesToggle() {
     btn.setAttribute('data-key', 'hide_exercises');
   }
 
-  // Nasłuchiwacz kliknięcia
   btn.addEventListener('click', toggleExercisesList);
 }
-window.renderHistoryList = async function() {
-  await loadSessionsData();
-  renderCalendar(currentCalendarYear, currentCalendarMonth);
-  initCalendarNavigation();
-};
+
+/* ============================================
+   STATYSTYKI AKTYWNOŚCI - Z PEŁNYM WYBOREM OKRESU
+   ============================================ */
+
+let activityChart = null;
+let currentActivityPeriod = 'month';
+let currentActivityId = null;
+let currentPeriodDate = new Date();
+
+async function renderActivityStats() {
+  const activitySelect = document.getElementById('stats-activity-select');
+  const summaryContainer = document.getElementById('activity-stats-summary');
+  const listContainer = document.getElementById('activity-list');
+  const container = document.getElementById('activity-stats-container');
+  
+  if (!summaryContainer || !listContainer || !container) return;
+  
+  container.style.display = 'block';
+  
+  // === CZYŚCIMY STATYSTYKI – na wypadek gdyby zostały z poprzedniego stanu ===
+  summaryContainer.innerHTML = '';
+  listContainer.innerHTML = '';
+  if (activityChart) {
+    activityChart.destroy();
+    activityChart = null;
+  }
+  
+  const exercises = await getAllExercises();
+  const activities = exercises.filter(ex => ex.type === 'activity');
+  
+  activitySelect.innerHTML = '';
+  
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = t('select_activity');
+  activitySelect.appendChild(defaultOption);
+  
+  if (activities.length === 0) {
+    summaryContainer.innerHTML = `<div class="stat-box" style="grid-column: span 2;"><div class="stat-value">-</div><div class="stat-label">${t('no_activities')}</div></div>`;
+    listContainer.innerHTML = '';
+    return;
+  }
+  
+  activities.forEach(ex => {
+    const opt = document.createElement('option');
+    opt.value = ex.id;
+    const label = ex.note ? `${ex.name} (${ex.note})` : ex.name;
+    opt.textContent = label;
+    activitySelect.appendChild(opt);
+  });
+  
+  // Nie ustawiamy automatycznie aktywności – czekamy na wybór użytkownika
+  activitySelect.value = '';
+  currentActivityId = null;
+  
+  // Aktualizacja zakresu lat na podstawie sesji
+  await updateYearRange();
+  
+  activitySelect.onchange = () => {
+    currentActivityId = activitySelect.value;
+    if (currentActivityId) {
+      updateActivityStats();
+    } else {
+      // Wyczyść statystyki po odznaczeniu
+      summaryContainer.innerHTML = '';
+      listContainer.innerHTML = '';
+      if (activityChart) {
+        activityChart.destroy();
+        activityChart = null;
+      }
+    }
+  };
+  
+  // Obsługa przycisków okresu
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentActivityPeriod = btn.dataset.period;
+      
+      const selectors = document.getElementById('stats-period-selectors');
+      if (currentActivityPeriod === 'today') {
+        selectors.style.display = 'none';
+      } else {
+        selectors.style.display = 'flex';
+      }
+      
+      if (currentActivityPeriod !== 'today') {
+        currentPeriodDate = new Date();
+        updatePeriodSelectors();
+      }
+      
+      if (currentActivityId) {
+        updateActivityStats();
+      }
+    };
+  });
+  
+  // Inicjalizacja selectorów dla miesięcy i lat
+  initPeriodSelectors();
+  
+  // ZMIANA: Usunięto wymuszenie display = 'flex' na starcie dla elementu 'stats-period-selectors'
+}
+
+async function updateYearRange() {
+  const sessions = await getAllSessions();
+  const yearSelect = document.getElementById('stats-year-select');
+  if (!yearSelect) return;
+  
+  let minYear = new Date().getFullYear();
+  let maxYear = new Date().getFullYear();
+  
+  sessions.forEach(s => {
+    const year = new Date(s.date).getFullYear();
+    if (year < minYear) minYear = year;
+    if (year > maxYear) maxYear = year;
+  });
+  
+  // Jeśli nie ma sesji, ustaw bieżący rok
+  if (sessions.length === 0) {
+    minYear = maxYear = new Date().getFullYear();
+  }
+  
+  yearSelect.innerHTML = '';
+  for (let y = maxYear; y >= minYear; y--) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y;
+    yearSelect.appendChild(opt);
+  }
+  
+  // Ustaw bieżący rok (lub najnowszy jeśli bieżący jest poza zakresem)
+  const currentYear = new Date().getFullYear();
+  if (yearSelect.querySelector(`option[value="${currentYear}"]`)) {
+    yearSelect.value = currentYear;
+  } else {
+    yearSelect.value = maxYear;
+  }
+}
+
+function initPeriodSelectors() {
+  const monthSelect = document.getElementById('stats-month-select');
+  const yearSelect = document.getElementById('stats-year-select');
+  
+  if (!monthSelect || !yearSelect) return;
+  
+  // Pobierz nazwy miesięcy z tłumaczeń
+  const lang = localStorage.getItem('gym-lang') || 'pl';
+  const monthNames = Object.values(translations[lang]?.months || translations['pl'].months);
+  
+  monthSelect.innerHTML = '';
+  monthNames.forEach((name, index) => {
+    const opt = document.createElement('option');
+    opt.value = index;
+    opt.textContent = name;
+    monthSelect.appendChild(opt);
+  });
+  
+  // Ustaw bieżący miesiąc
+  const now = new Date();
+  monthSelect.value = now.getMonth();
+  
+  // Rok już jest ustawiony przez updateYearRange
+  if (!yearSelect.value) {
+    yearSelect.value = now.getFullYear();
+  }
+  
+  // Nasłuchiwacze
+  monthSelect.onchange = () => {
+    const selectedYear = parseInt(yearSelect.value) || new Date().getFullYear();
+    const selectedMonth = parseInt(monthSelect.value);
+    currentPeriodDate = new Date(selectedYear, selectedMonth, 1);
+    if (currentActivityId) updateActivityStats();
+  };
+  
+  yearSelect.onchange = () => {
+    const selectedYear = parseInt(yearSelect.value) || new Date().getFullYear();
+    const selectedMonth = parseInt(monthSelect.value) || new Date().getMonth();
+    currentPeriodDate = new Date(selectedYear, selectedMonth, 1);
+    if (currentActivityId) updateActivityStats();
+  };
+}
+
+function updatePeriodSelectors() {
+  const monthSelect = document.getElementById('stats-month-select');
+  const yearSelect = document.getElementById('stats-year-select');
+  if (!monthSelect || !yearSelect) return;
+  
+  const now = new Date();
+  if (yearSelect.querySelector(`option[value="${now.getFullYear()}"]`)) {
+    yearSelect.value = now.getFullYear();
+  }
+  monthSelect.value = now.getMonth();
+}
+
+async function updateActivityStats() {
+  const activityId = currentActivityId;
+  if (!activityId) return;
+  
+  const sessions = await getAllSessions();
+  const activitySessions = sessions.filter(s => {
+    return s.type === 'activity' && s.exercises && s.exercises.some(ex => ex.exerciseId === parseInt(activityId));
+  });
+  
+  const now = new Date();
+  let startDate = new Date();
+  
+  if (currentActivityPeriod === 'today') {
+    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    startDate.setHours(0, 0, 0, 0);
+  } else {
+    const refDate = currentPeriodDate || new Date();
+    
+    switch(currentActivityPeriod) {
+      case 'week':
+        startDate = new Date(refDate);
+        startDate.setDate(refDate.getDate() - 7);
+        break;
+      case 'month':
+        startDate = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
+        break;
+      case 'year':
+        startDate = new Date(refDate.getFullYear(), 0, 1);
+        break;
+      default:
+        startDate = new Date(refDate);
+        startDate.setMonth(refDate.getMonth() - 1);
+    }
+  }
+  
+  const filtered = activitySessions.filter(s => {
+    const sessionDate = new Date(s.date);
+    return sessionDate >= startDate && sessionDate <= now;
+  });
+  
+  const total = filtered.length;
+  const totalTime = filtered.reduce((sum, s) => sum + (s.duration || 0), 0);
+  const avgTime = total > 0 ? Math.round(totalTime / total) : 0;
+  const longest = total > 0 ? Math.max(...filtered.map(s => s.duration || 0)) : 0;
+  
+  const summaryContainer = document.getElementById('activity-stats-summary');
+  summaryContainer.innerHTML = `
+    <div class="stat-box">
+      <div class="stat-value">${total}</div>
+      <div class="stat-label">${t('activity_count')}</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value">${formatTime(totalTime)}</div>
+      <div class="stat-label">${t('total_activity_time')}</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value">${formatTime(avgTime)}</div>
+      <div class="stat-label">${t('avg_activity_time')}</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value">${formatTime(longest)}</div>
+      <div class="stat-label">${t('longest_activity')}</div>
+    </div>
+  `;
+  
+  renderActivityChart(filtered);
+  
+  const listContainer = document.getElementById('activity-list');
+  if (filtered.length === 0) {
+    listContainer.innerHTML = `<div class="history-item"><p>${t('no_activities')}</p></div>`;
+    return;
+  }
+  
+  const sorted = filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+  const lang = localStorage.getItem('gym-lang') || 'pl';
+  
+  listContainer.innerHTML = sorted.map(session => {
+    const date = new Date(session.date);
+    const dateStr = date.toLocaleDateString(lang);
+    const duration = session.duration ? formatTime(session.duration) : '-';
+    const name = session.workoutName || 'Aktywność';
+    const note = session.exercises?.[0]?.note || '';
+    
+    return `
+      <div class="history-item">
+        <div class="history-date">${dateStr}</div>
+        <div style="font-weight: 700; margin-bottom: 4px;">🏃 ${escapeHtml(name)}${note ? ' • ' + escapeHtml(note) : ''}</div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary);">
+          ⏱️ ${duration}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderActivityChart(sessions) {
+  const ctx = document.getElementById('activity-chart');
+  if (!ctx) return;
+  
+  if (activityChart) {
+    activityChart.destroy();
+    activityChart = null;
+  }
+  
+  if (sessions.length === 0) {
+    return;
+  }
+  
+  const lang = localStorage.getItem('gym-lang') || 'pl';
+  const grouped = {};
+  
+  sessions.forEach(s => {
+    const date = new Date(s.date);
+    let key;
+    
+    if (currentActivityPeriod === 'today') {
+      key = date.toLocaleDateString(lang, { hour: '2-digit', minute: '2-digit' });
+    } else if (currentActivityPeriod === 'week') {
+      key = date.toLocaleDateString(lang, { weekday: 'short' });
+    } else if (currentActivityPeriod === 'month') {
+      key = date.toLocaleDateString(lang, { day: 'numeric', month: 'short' });
+    } else {
+      key = date.toLocaleDateString(lang, { month: 'short', year: 'numeric' });
+    }
+    grouped[key] = (grouped[key] || 0) + 1;
+  });
+  
+  const labels = Object.keys(grouped);
+  const data = Object.values(grouped);
+  
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const textColor = isDark ? '#a0a0b0' : '#636e72';
+  const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+  
+  activityChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: t('activity_count'),
+        data: data,
+        backgroundColor: '#ff3366',
+        borderRadius: 4,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: gridColor },
+          ticks: { color: textColor, font: { size: 10 } }
+        },
+        y: {
+          grid: { color: gridColor },
+          ticks: { color: textColor, font: { size: 10 }, stepSize: 1 },
+          beginAtZero: true
+        }
+      }
+    }
+  });
+}
+
+function switchStatsTab(tabType) {
+  const activityContainer = document.getElementById('activity-stats-container');
+  const exerciseSelectGroup = document.getElementById('exercise-select-group');
+  const statsSummary = document.getElementById('stats-summary');
+  const chartContainer = document.getElementById('main-chart')?.parentElement;
+  const activityChartContainer = document.getElementById('activity-chart-container');
+
+  if (!activityContainer) return;
+
+  if (tabType === 'activity-stats') {
+    activityContainer.classList.remove('hidden');
+    if (exerciseSelectGroup) exerciseSelectGroup.classList.add('hidden');
+    if (statsSummary) statsSummary.classList.add('hidden');
+    if (chartContainer) chartContainer.classList.add('hidden');
+    if (activityChartContainer) activityChartContainer.classList.remove('hidden');
+    
+    // === RESET stanu aktywności przed wyrenderowaniem ===
+    currentActivityId = null; 
+    currentActivityPeriod = null;
+    
+    // Usuwamy podświetlenie z przycisków okresu (Dzień, Miesiąc, Rok)
+    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+    
+    // Ukrywamy selektory okresów (np. strzałki wyboru miesiąca/roku) na start
+    const selectors = document.getElementById('stats-period-selectors');
+    if (selectors) selectors.style.display = 'none';
+
+    renderActivityStats();
+  } else {
+    activityContainer.classList.add('hidden');
+    if (exerciseSelectGroup) exerciseSelectGroup.classList.remove('hidden');
+    if (statsSummary) statsSummary.classList.remove('hidden');
+    if (chartContainer) chartContainer.classList.remove('hidden');
+    if (activityChartContainer) activityChartContainer.classList.add('hidden');
+    
+    // === RESET SELEKTORA I CZYSZCZENIE WYKRESU ===
+    const select = document.getElementById('stats-exercise-select');
+    if (select) {
+      select.value = ''; // Reset do "Wybierz ćwiczenie"
+    }
+    
+    // Wyczyść wykres i statystyki
+    if (typeof renderStatsChart === 'function') {
+      renderStatsChart(tabType === 'weight-chart' ? 'weight-chart' : 'volume-chart', [], [], t('select_exercise'));
+    }
+    if (typeof renderStatsSummary === 'function') {
+      renderStatsSummary([], tabType === 'weight-chart' ? 'weight-chart' : 'volume-chart');
+    }
+  }
+}
