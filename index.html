@@ -29,10 +29,14 @@
                 <div id="workouts-list" class="card-list"></div>
 
                 <div class="section-header mt-2">
-                    <h2 data-key="exercise_library">Biblioteka Cwiczen</h2>
-                    <button id="btn-new-exercise" class="btn-secondary" data-key="new_exercise">+ Cwiczenie</button>
-                </div>
-                <div id="exercises-list" class="card-list"></div>
+    <h2 data-key="exercise_library">Biblioteka Cwiczen</h2>
+    <div style="display: flex; gap: 8px; align-items: center;">
+        <button id="btn-toggle-exercises" class="btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" data-key="hide_exercises">▲ Ukryj</button>
+        <button id="btn-new-exercise" class="btn-secondary" data-key="new_exercise">+ Cwiczenie</button>
+    </div>
+</div>
+<div id="exercises-list" class="card-list"></div>
+                
             </section>
 
             <!-- SCREEN: DEFINIOWANIE CWICZENIA -->
@@ -41,36 +45,62 @@
                 <form id="exercise-form">
                     <input type="hidden" id="ex-id">
                     <div class="form-group">
-                        <label data-key="exercise_name">Nazwa cwiczenia</label>
+                        <label data-key="exercise_name">Nazwa ćwiczenia</label>
                         <input type="text" id="ex-name" required data-placeholder-key="exercise_placeholder" placeholder="np. Wyciskanie sztangi">
                     </div>
                     <div class="form-group">
-                        <label data-key="muscle_group">Grupa miesniowa</label>
-                        <select id="ex-muscle">
-                            <option value="Klatka piersiowa">Klatka piersiowa</option>
-                            <option value="Plecy">Plecy</option>
-                            <option value="Barki">Barki</option>
-                            <option value="Biceps">Biceps</option>
-                            <option value="Triceps">Triceps</option>
-                            <option value="Nogi">Nogi</option>
-                            <option value="Brzuch">Brzuch</option>
-                            <option value="Inne">Inne</option>
+                        <label data-key="activity_type">Typ ćwiczenia</label>
+                        <select id="ex-type">
+							<option value="" data-key="select_option">-- Wybierz --</option>
+                            <option value="strength" data-key="strength_training">Trening siłowy</option>
+                            <option value="activity" data-key="general_activity">Aktywność ogólna</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label data-key="weight">Waga domyslna (kg)</label>
-                        <div class="number-input">
-                            <button type="button" class="btn-minus" onclick="adjustValue('ex-weight', -2.5)">&#8722;</button>
-                            <input type="number" id="ex-weight" value="20" step="0.5" min="0">
-                            <button type="button" class="btn-plus" onclick="adjustValue('ex-weight', 2.5)">+</button>
+                    <!-- Sekcja dla treningu siłowego -->
+                    <div id="ex-strength-fields">
+                        <div class="form-group">
+                            <label data-key="muscle_group">Grupa mięśniowa</label>
+                            <select id="ex-muscle">
+                                <option value="" data-key="select_option">-- Wybierz --</option>
+								<option value="Klatka piersiowa">Klatka piersiowa</option>
+                                <option value="Plecy">Plecy</option>
+                                <option value="Barki">Barki</option>
+                                <option value="Biceps">Biceps</option>
+                                <option value="Triceps">Triceps</option>
+                                <option value="Nogi">Nogi</option>
+                                <option value="Brzuch">Brzuch</option>
+                                <option value="Inne">Inne</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label data-key="weight">Waga domyślna (kg)</label>
+                            <div class="number-input">
+                                <button type="button" class="btn-minus" onclick="adjustValue('ex-weight', -2.5)">&#8722;</button>
+                                <input type="number" id="ex-weight" value="20" step="0.5" min="0">
+                                <button type="button" class="btn-plus" onclick="adjustValue('ex-weight', 2.5)">+</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label data-key="reps">Powtórzenia domyślne</label>
+                            <div class="number-input">
+                                <button type="button" class="btn-minus" onclick="adjustValue('ex-reps', -1)">&#8722;</button>
+                                <input type="number" id="ex-reps" value="8" min="1" max="100">
+                                <button type="button" class="btn-plus" onclick="adjustValue('ex-reps', 1)">+</button>
+                            </div>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label data-key="reps">Powtorzenia domyslne</label>
-                        <div class="number-input">
-                            <button type="button" class="btn-minus" onclick="adjustValue('ex-reps', -1)">&#8722;</button>
-                            <input type="number" id="ex-reps" value="8" min="1" max="100">
-                            <button type="button" class="btn-plus" onclick="adjustValue('ex-reps', 1)">+</button>
+                    <!-- Sekcja dla aktywności ogólnej -->
+                    <div id="ex-activity-fields" style="display:none;">
+                        <div class="form-group">
+                            <label data-key="measure_duration">Mierz czas trwania?</label>
+                            <label class="toggle">
+                                <input type="checkbox" id="ex-measure-duration" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label data-key="activity_note">Notatka (opcjonalnie)</label>
+                            <input type="text" id="ex-activity-note" data-placeholder-key="activity_note_placeholder" placeholder="np. Mecz ligowy, trening z trenerem">
                         </div>
                     </div>
                     <div class="form-actions">
@@ -80,43 +110,73 @@
                 </form>
             </section>
 
-            <!-- SCREEN: DEFINIOWANIE TRENINGU -->
-            <section id="screen-workout-form" class="screen">
-                <h2 data-key="define_workout">Definiuj Trening</h2>
-                <form id="workout-form">
-                    <input type="hidden" id="wo-id">
-                    <div class="form-group">
-                        <label data-key="workout_name">Nazwa treningu</label>
-                        <input type="text" id="wo-name" required data-placeholder-key="workout_placeholder" placeholder="np. Piers i Biceps">
-                    </div>
-                    <div class="form-group">
-                        <label data-key="global_sets">Liczba serii (dla wszystkich cwiczen)</label>
-                        <div class="number-input">
-                            <button type="button" class="btn-minus" onclick="adjustValue('wo-sets', -1)">&#8722;</button>
-                            <input type="number" id="wo-sets" value="4" min="1" max="20">
-                            <button type="button" class="btn-plus" onclick="adjustValue('wo-sets', 1)">+</button>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label data-key="rest_time">Przerwa miedzy seriami (sek)</label>
-                        <div class="number-input">
-                            <button type="button" class="btn-minus" onclick="adjustValue('wo-rest', -15)">&#8722;</button>
-                            <input type="number" id="wo-rest" value="90" min="0" max="600" step="15">
-                            <button type="button" class="btn-plus" onclick="adjustValue('wo-rest', 15)">+</button>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label data-key="select_exercises">Wybierz cwiczenia:</label>
-                        <div id="wo-exercises-select" class="exercises-select"></div>
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn-primary btn-large" data-key="save">Zapisz Trening</button>
-                        <button type="button" id="btn-cancel-workout" class="btn-secondary" data-key="cancel">Anuluj</button>
-                    </div>
-                </form>
-            </section>
+           <!-- SCREEN: DEFINIOWANIE TRENINGU -->
+<section id="screen-workout-form" class="screen">
+  <h2 data-key="define_workout">Definiuj Trening</h2>
+  <form id="workout-form">
+    <input type="hidden" id="wo-id">
+    <input type="hidden" id="wo-type" value="strength">
+    
+    <!-- PRZEŁĄCZNIK TYPU -->
+    <div class="form-group">
+      <label data-key="workout_type">Typ treningu</label>
+      <select id="wo-type-select">
+        <option value="" data-key="select_option">-- Wybierz --</option>
+		<option value="strength" data-key="strength_training">Trening siłowy</option>
+        <option value="activity" data-key="general_activity">Aktywność ogólna</option>
+      </select>
+    </div>
 
-            <!-- SCREEN: AKTYWNY TRENING -->
+    <!-- NAZWA -->
+    <div class="form-group">
+      <label data-key="workout_name">Nazwa treningu</label>
+      <input type="text" id="wo-name" required data-placeholder-key="workout_placeholder" placeholder="np. Piers i Biceps">
+    </div>
+
+    <!-- POLA DLA SIŁOWEGO -->
+    <div id="wo-strength-fields">
+      <div class="form-group">
+        <label data-key="global_sets">Liczba serii (dla wszystkich ćwiczeń)</label>
+        <div class="number-input">
+          <button type="button" class="btn-minus" onclick="adjustValue('wo-sets', -1)">&#8722;</button>
+          <input type="number" id="wo-sets" value="4" min="1" max="20">
+          <button type="button" class="btn-plus" onclick="adjustValue('wo-sets', 1)">+</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label data-key="rest_time">Przerwa między seriami (sek)</label>
+        <div class="number-input">
+          <button type="button" class="btn-minus" onclick="adjustValue('wo-rest', -15)">&#8722;</button>
+          <input type="number" id="wo-rest" value="90" min="0" max="600" step="15">
+          <button type="button" class="btn-plus" onclick="adjustValue('wo-rest', 15)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- WYBIERZ ĆWICZENIA / AKTYWNOŚCI – wspólny kontener -->
+    <div class="form-group">
+      <label data-key="select_exercises">Wybierz ćwiczenia:</label>
+      
+      <!-- Lista dla siłowych -->
+      <div id="wo-exercises-select" class="exercises-select"></div>
+      
+      <!-- Lista dla aktywności (ukryta domyślnie) -->
+      <div id="wo-activity-select" class="exercises-select" style="display:none;"></div>
+      
+      <!-- Komunikat dla aktywności (zwykły tekst, nie osobny box) -->
+      <p id="wo-activity-hint" style="display:none; margin-top: 8px; font-size: 0.85rem; color: var(--text-secondary);" data-key="select_one_activity">
+		🏃 Wybierz <strong>jedną</strong> aktywność z listy powyżej.
+		</p>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn-primary btn-large" data-key="save_workout">Zapisz Trening</button>
+      <button type="button" id="btn-cancel-workout" class="btn-secondary" data-key="cancel">Anuluj</button>
+    </div>
+  </form>
+</section>
+
+            <!-- SCREEN: AKTYWNY TRENING SIŁOWY -->
             <section id="screen-active-workout" class="screen">
                 <div id="pause-overlay" class="pause-overlay hidden">
                     <div class="pause-content">
@@ -192,6 +252,29 @@
                 </div>
             </section>
 
+            <!-- SCREEN: AKTYWNOŚĆ OGÓLNA (NOWY) -->
+            <section id="screen-activity-workout" class="screen">
+                <div class="activity-container">
+                    <div class="activity-icon">🏃</div>
+                    <h2 id="activity-name" class="activity-name">Tenis stołowy</h2>
+                    
+                    <div class="activity-timer-box">
+                        <span class="timer-icon">⏱️</span>
+                        <span id="activity-timer" class="activity-timer">0:00</span>
+                    </div>
+
+                    <div class="activity-form-group">
+                        <label data-key="activity_note">Notatka</label>
+                        <input type="text" id="activity-note-input" data-placeholder-key="activity_note_placeholder" placeholder="np. Mecz ligowy">
+                    </div>
+
+                    <div class="activity-actions">
+                        <button id="btn-finish-activity" class="btn-primary btn-large" data-key="finish_activity">Zakończ aktywność</button>
+                        <button id="btn-cancel-activity" class="btn-secondary btn-large" data-key="cancel">Anuluj</button>
+                    </div>
+                </div>
+            </section>
+
             <!-- SCREEN: STATYSTYKI -->
             <section id="screen-stats" class="screen">
                 <h2 data-key="statistics">Statystyki</h2>
@@ -259,7 +342,18 @@
             <!-- SCREEN: HISTORIA TRENINGOW -->
             <section id="screen-history" class="screen">
                 <h2 data-key="workout_history">Historia Treningow</h2>
-                <div id="history-list" class="history-list"></div>
+                <div class="calendar-container">
+                    <div class="calendar-header">
+                        <button id="calendar-prev" class="icon-btn">‹</button>
+                        <span id="calendar-month-year" class="calendar-month-year"></span>
+                        <button id="calendar-next" class="icon-btn">›</button>
+                    </div>
+                    <div class="calendar-weekdays">
+                        <span>Pn</span><span>Wt</span><span>Śr</span><span>Czw</span><span>Pt</span><span>Sob</span><span>Niedz</span>
+                    </div>
+                    <div id="calendar-grid" class="calendar-grid"></div>
+                </div>
+                <div id="day-details" class="day-details"></div>
             </section>
 
             <!-- SCREEN: USTAWIENIA -->
@@ -313,7 +407,7 @@
         </div>
     </div>
 
-    <!-- FALLBACK dla adjustValue (przed wszystkimi skryptami) -->
+    <!-- FALLBACK dla adjustValue -->
     <script>
         window.adjustValue = window.adjustValue || function(id, delta) {
             var input = document.getElementById(id);
