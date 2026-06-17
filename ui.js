@@ -274,9 +274,27 @@ function editWorkout(id) {
     document.getElementById('wo-name').value = wo.name || '';
     document.getElementById('wo-type').value = wo.type || 'strength';
     
+    // Ustaw select typu
+    const typeSelect = document.getElementById('wo-type-select');
+    if (typeSelect) typeSelect.value = wo.type || 'strength';
+    
     const isActivity = wo.type === 'activity';
+    
+    // Pokaż/ukryj odpowiednie sekcje
     document.getElementById('wo-strength-fields').style.display = isActivity ? 'none' : 'block';
-    document.getElementById('wo-activity-info').style.display = isActivity ? 'block' : 'none';
+    
+    // Dla aktywności – pokaż komunikat i listę aktywności
+    const hint = document.getElementById('wo-activity-hint');
+    if (hint) {
+      hint.style.display = isActivity ? 'block' : 'none';
+      if (isActivity) {
+        hint.innerHTML = t('select_one_activity');
+      }
+    }
+    
+    // Pokaż/ukryj listy ćwiczeń
+    document.getElementById('wo-exercises-select').style.display = isActivity ? 'none' : 'block';
+    document.getElementById('wo-activity-select').style.display = isActivity ? 'block' : 'none';
     
     if (isActivity) {
       renderWorkoutActivitySelect().then(() => {
