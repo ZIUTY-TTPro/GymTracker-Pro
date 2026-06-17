@@ -226,26 +226,30 @@ window.showScreen = function(screenId, title) {
   if (main) main.scrollTop = 0;
 
   if (screenId === 'screen-stats') {
-    renderStatsExerciseSelect().then(() => {
-      const activeTab = document.querySelector('.stats-tabs .tab-btn.active');
-      if (activeTab) {
-        const tab = activeTab.dataset.tab;
-        if (tab === 'activity-stats') {
+    const activeTab = document.querySelector('.stats-tabs .tab-btn.active');
+    const isActivityTab = activeTab && activeTab.dataset.tab === 'activity-stats';
+    
+    if (!isActivityTab) {
+      renderStatsExerciseSelect().then(() => {
+        const activeTab2 = document.querySelector('.stats-tabs .tab-btn.active');
+        if (activeTab2) {
+          const tab = activeTab2.dataset.tab;
           if (typeof switchStatsTab === 'function') {
             switchStatsTab(tab);
           }
-        } else if (typeof updateStatsChart === 'function') {
-          updateStatsChart(tab);
         }
+      }).catch(e => console.error('Stats error:', e));
+    } else {
+      if (typeof switchStatsTab === 'function') {
+        switchStatsTab('activity-stats');
       }
-    }).catch(e => console.error('Stats error:', e));
+    }
   }
 
   if (screenId === 'screen-history') {
     renderHistoryList().catch(e => console.error('History error:', e));
   }
   
-  // Zapisz aktualny ekran przy każdej zmianie
   try {
     localStorage.setItem('gym-current-screen', screenId);
   } catch(e) { /* ignore */ }
@@ -297,17 +301,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     await renderWorkoutActivitySelect();
   } catch (e) { console.error('renderWorkoutActivitySelect error:', e); }
 
+  // NIE ustawiamy żadnego ćwiczenia – czekamy na wybór użytkownika
   const statsSelect = document.getElementById('stats-exercise-select');
-  if (statsSelect && statsSelect.options.length > 1) {
-    statsSelect.value = statsSelect.options[1].value;
-    try {
-      await updateStatsChart('weight-chart');
-    } catch (e) { console.error('updateStatsChart error:', e); }
+  if (statsSelect) {
+    statsSelect.value = '';
   }
 
   setupEventListeners();
   
-  // Przywróć ostatni ekran lub domyślnie home
   const lastScreen = localStorage.getItem('gym-current-screen') || 'screen-home';
   const titleMap = {
     'screen-home': 'GymTracker Pro',
@@ -698,24 +699,37 @@ function setupEventListeners() {
       btn.classList.add('active');
       const tab = btn.dataset.tab;
       
-      if (tab === 'activity-stats') {
-        if (typeof switchStatsTab === 'function') {
-          switchStatsTab(tab);
-        }
-      } else {
-        document.getElementById('activity-stats-container').style.display = 'none';
-        document.getElementById('stats-summary').style.display = 'grid';
-        document.getElementById('main-chart').parentElement.style.display = 'block';
-        if (typeof updateStatsChart === 'function') {
-          try {
-            await updateStatsChart(tab);
-          } catch (e) { console.error('Stats chart error:', e); }
+      if (typeof switchStatsTab === 'function') {
+        switchStatsTab(tab);
+      }
+      
+      if (tab !== 'activity-stats') {
+        const select = document.getElementById('stats-exercise-select');
+        if (select && select.value && select.value !== '') {
+          if (typeof updateStatsChart === 'function') {
+            try {
+              await updateStatsChart(tab);
+            } catch (e) { console.error('Stats chart error:', e); }
+          }
         }
       }
     });
   });
 
   document.getElementById('stats-exercise-select')?.addEventListener('change', async () => {
+    const select = document.getElementById('stats-exercise-select');
+    const exerciseId = select?.value;
+    
+    if (!exerciseId || exerciseId === '') {
+      if (typeof renderStatsChart === 'function') {
+        renderStatsChart('weight-chart', [], [], t('select_exercise'));
+      }
+      if (typeof renderStatsSummary === 'function') {
+        renderStatsSummary([], 'weight-chart');
+      }
+      return;
+    }
+    
     const activeTab = document.querySelector('.stats-tabs .tab-btn.active');
     if (activeTab && activeTab.dataset.tab !== 'activity-stats') {
       if (typeof updateStatsChart === 'function') {
@@ -851,7 +865,8 @@ function setupEventListeners() {
 
 async function updateStatsChart(tabType) {
   const exerciseSelect = document.getElementById('stats-exercise-select');
-  const exerciseId = exerciseSelect?.value;
+  const exerciseId = exerciseSelect ? exerciseSelect.value : '';
+
   if (tabType === 'weight-chart') {
     if (!exerciseId || exerciseId === '') {
       if (typeof renderStatsChart === 'function') renderStatsChart('weight-chart', [], [], t('select_exercise'));
@@ -860,16 +875,39 @@ async function updateStatsChart(tabType) {
     }
     const stats = await getExerciseStats(parseInt(exerciseId));
     const labels = stats.map(s => s.date.split('T')[0]);
-    const data = stats.map(s => ({ maxWeight: s.maxWeight, volume: s.totalVolume }));
+    const data = stats.map(s => ({ weight: s.maxWeight }));
     const exercise = await getExercise(parseInt(exerciseId));
-    if (typeof renderStatsChart === 'function') renderStatsChart('weight-chart', data, labels, exercise?.name || t('weight'));
+    if (typeof renderStatsChart === 'function') renderStatsChart('weight-chart', data, labels, exercise?.name || t('max_weight'));
     if (typeof renderStatsSummary === 'function') renderStatsSummary(stats, 'weight-chart');
+
   } else if (tabType === 'volume-chart') {
-    const volumeStats = await getVolumeStats();
-    const labels = volumeStats.map(s => s.date);
-    const data = volumeStats.map(s => ({ volume: s.volume }));
-    if (typeof renderStatsChart === 'function') renderStatsChart('volume-chart', data, labels, t('volume'));
-    if (typeof renderStatsSummary === 'function') renderStatsSummary(volumeStats.map(s => ({ volume: s.volume })), 'volume-chart');
+    // Sprawdzamy czy wybrano ćwiczenie - jeśli nie, czyścimy wykres i podsumowanie
+    if (!exerciseId || exerciseId === '') {
+      if (typeof renderStatsChart === 'function') renderStatsChart('volume-chart', [], [], t('select_exercise'));
+      if (typeof renderStatsSummary === 'function') renderStatsSummary([], 'volume-chart');
+      return;
+    }
+    
+    // Pobieramy statystyki dla konkretnego ćwiczenia
+    const volumeStats = await getExerciseStats(parseInt(exerciseId)); 
+    const labels = volumeStats.map(s => s.date.split('T')[0]);
+    // Mapujemy dane na obiekt z kluczem 'volume', którego oczekuje Chart.js w ui.js
+    const data = volumeStats.map(s => ({ volume: s.totalVolume }));
+    const exercise = await getExercise(parseInt(exerciseId));
+    
+    if (typeof renderStatsChart === 'function') {
+      renderStatsChart('volume-chart', data, labels, exercise?.name || t('volume'));
+    }
+    
+    if (typeof renderStatsSummary === 'function') {
+      // Przekazujemy przemapowane dane, aby renderStatsSummary poprawnie wyliczyło średnie i maksima
+      const summaryData = volumeStats.map(s => ({
+        maxWeight: s.maxWeight,
+        weight: s.maxWeight, 
+        volume: s.totalVolume
+      }));
+      renderStatsSummary(summaryData, 'volume-chart');
+    }
   }
 }
 
