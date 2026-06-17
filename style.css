@@ -1637,3 +1637,29 @@ body {
 #exercises-list.collapsed + .mt-2 {
   margin-top: 0;
 }
+
+/* ===== STATYSTYKI AKTYWNOŚCI ===== */
+.stats-period-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.period-btn {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    color: var(--text-secondary);
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    flex: 1;
+}
+
+.period-btn.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+}
