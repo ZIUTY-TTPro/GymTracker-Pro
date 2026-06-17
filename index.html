@@ -29,14 +29,13 @@
                 <div id="workouts-list" class="card-list"></div>
 
                 <div class="section-header mt-2">
-    <h2 data-key="exercise_library">Biblioteka Cwiczen</h2>
-    <div style="display: flex; gap: 8px; align-items: center;">
-        <button id="btn-toggle-exercises" class="btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" data-key="hide_exercises">▲ Ukryj</button>
-        <button id="btn-new-exercise" class="btn-secondary" data-key="new_exercise">+ Cwiczenie</button>
-    </div>
-</div>
-<div id="exercises-list" class="card-list"></div>
-                
+                    <h2 data-key="exercise_library">Biblioteka Cwiczen</h2>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button id="btn-toggle-exercises" class="btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" data-key="hide_exercises">▲ Ukryj</button>
+                        <button id="btn-new-exercise" class="btn-secondary" data-key="new_exercise">+ Cwiczenie</button>
+                    </div>
+                </div>
+                <div id="exercises-list" class="card-list"></div>
             </section>
 
             <!-- SCREEN: DEFINIOWANIE CWICZENIA -->
@@ -51,18 +50,17 @@
                     <div class="form-group">
                         <label data-key="activity_type">Typ ćwiczenia</label>
                         <select id="ex-type">
-							<option value="" data-key="select_option">-- Wybierz --</option>
+                            <option value="" data-key="select_option">-- Wybierz --</option>
                             <option value="strength" data-key="strength_training">Trening siłowy</option>
                             <option value="activity" data-key="general_activity">Aktywność ogólna</option>
                         </select>
                     </div>
-                    <!-- Sekcja dla treningu siłowego -->
                     <div id="ex-strength-fields">
                         <div class="form-group">
                             <label data-key="muscle_group">Grupa mięśniowa</label>
                             <select id="ex-muscle">
                                 <option value="" data-key="select_option">-- Wybierz --</option>
-								<option value="Klatka piersiowa">Klatka piersiowa</option>
+                                <option value="Klatka piersiowa">Klatka piersiowa</option>
                                 <option value="Plecy">Plecy</option>
                                 <option value="Barki">Barki</option>
                                 <option value="Biceps">Biceps</option>
@@ -89,7 +87,6 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Sekcja dla aktywności ogólnej -->
                     <div id="ex-activity-fields" style="display:none;">
                         <div class="form-group">
                             <label data-key="measure_duration">Mierz czas trwania?</label>
@@ -110,71 +107,61 @@
                 </form>
             </section>
 
-           <!-- SCREEN: DEFINIOWANIE TRENINGU -->
-<section id="screen-workout-form" class="screen">
-  <h2 data-key="define_workout">Definiuj Trening</h2>
-  <form id="workout-form">
-    <input type="hidden" id="wo-id">
-    <input type="hidden" id="wo-type" value="strength">
-    
-    <!-- PRZEŁĄCZNIK TYPU -->
-    <div class="form-group">
-      <label data-key="workout_type">Typ treningu</label>
-      <select id="wo-type-select">
-        <option value="" data-key="select_option">-- Wybierz --</option>
-		<option value="strength" data-key="strength_training">Trening siłowy</option>
-        <option value="activity" data-key="general_activity">Aktywność ogólna</option>
-      </select>
-    </div>
+            <!-- SCREEN: DEFINIOWANIE TRENINGU -->
+            <section id="screen-workout-form" class="screen">
+                <h2 data-key="define_workout">Definiuj Trening</h2>
+                <form id="workout-form">
+                    <input type="hidden" id="wo-id">
+                    <input type="hidden" id="wo-type" value="strength">
+                    
+                    <div class="form-group">
+                        <label data-key="workout_type">Typ treningu</label>
+                        <select id="wo-type-select">
+                            <option value="" data-key="select_option">-- Wybierz --</option>
+                            <option value="strength" data-key="strength_training">Trening siłowy</option>
+                            <option value="activity" data-key="general_activity">Aktywność ogólna</option>
+                        </select>
+                    </div>
 
-    <!-- NAZWA -->
-    <div class="form-group">
-      <label data-key="workout_name">Nazwa treningu</label>
-      <input type="text" id="wo-name" required data-placeholder-key="workout_placeholder" placeholder="np. Piers i Biceps">
-    </div>
+                    <div class="form-group">
+                        <label data-key="workout_name">Nazwa treningu</label>
+                        <input type="text" id="wo-name" required data-placeholder-key="workout_placeholder" placeholder="np. Piers i Biceps">
+                    </div>
 
-    <!-- POLA DLA SIŁOWEGO -->
-    <div id="wo-strength-fields">
-      <div class="form-group">
-        <label data-key="global_sets">Liczba serii (dla wszystkich ćwiczeń)</label>
-        <div class="number-input">
-          <button type="button" class="btn-minus" onclick="adjustValue('wo-sets', -1)">&#8722;</button>
-          <input type="number" id="wo-sets" value="4" min="1" max="20">
-          <button type="button" class="btn-plus" onclick="adjustValue('wo-sets', 1)">+</button>
-        </div>
-      </div>
-      <div class="form-group">
-        <label data-key="rest_time">Przerwa między seriami (sek)</label>
-        <div class="number-input">
-          <button type="button" class="btn-minus" onclick="adjustValue('wo-rest', -15)">&#8722;</button>
-          <input type="number" id="wo-rest" value="90" min="0" max="600" step="15">
-          <button type="button" class="btn-plus" onclick="adjustValue('wo-rest', 15)">+</button>
-        </div>
-      </div>
-    </div>
+                    <div id="wo-strength-fields">
+                        <div class="form-group">
+                            <label data-key="global_sets">Liczba serii (dla wszystkich ćwiczeń)</label>
+                            <div class="number-input">
+                                <button type="button" class="btn-minus" onclick="adjustValue('wo-sets', -1)">&#8722;</button>
+                                <input type="number" id="wo-sets" value="4" min="1" max="20">
+                                <button type="button" class="btn-plus" onclick="adjustValue('wo-sets', 1)">+</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label data-key="rest_time">Przerwa między seriami (sek)</label>
+                            <div class="number-input">
+                                <button type="button" class="btn-minus" onclick="adjustValue('wo-rest', -15)">&#8722;</button>
+                                <input type="number" id="wo-rest" value="90" min="0" max="600" step="15">
+                                <button type="button" class="btn-plus" onclick="adjustValue('wo-rest', 15)">+</button>
+                            </div>
+                        </div>
+                    </div>
 
-    <!-- WYBIERZ ĆWICZENIA / AKTYWNOŚCI – wspólny kontener -->
-    <div class="form-group">
-      <label data-key="select_exercises">Wybierz ćwiczenia:</label>
-      
-      <!-- Lista dla siłowych -->
-      <div id="wo-exercises-select" class="exercises-select"></div>
-      
-      <!-- Lista dla aktywności (ukryta domyślnie) -->
-      <div id="wo-activity-select" class="exercises-select" style="display:none;"></div>
-      
-      <!-- Komunikat dla aktywności (zwykły tekst, nie osobny box) -->
-      <p id="wo-activity-hint" style="display:none; margin-top: 8px; font-size: 0.85rem; color: var(--text-secondary);" data-key="select_one_activity">
-		🏃 Wybierz <strong>jedną</strong> aktywność z listy powyżej.
-		</p>
-    </div>
+                    <div class="form-group">
+                        <label data-key="select_exercises">Wybierz ćwiczenia:</label>
+                        <div id="wo-exercises-select" class="exercises-select"></div>
+                        <div id="wo-activity-select" class="exercises-select" style="display:none;"></div>
+                        <p id="wo-activity-hint" style="display:none; margin-top: 8px; font-size: 0.85rem; color: var(--text-secondary);" data-key="select_one_activity">
+                            🏃 Wybierz <strong>jedną</strong> aktywność z listy powyżej.
+                        </p>
+                    </div>
 
-    <div class="form-actions">
-      <button type="submit" class="btn-primary btn-large" data-key="save_workout">Zapisz Trening</button>
-      <button type="button" id="btn-cancel-workout" class="btn-secondary" data-key="cancel">Anuluj</button>
-    </div>
-  </form>
-</section>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary btn-large" data-key="save_workout">Zapisz Trening</button>
+                        <button type="button" id="btn-cancel-workout" class="btn-secondary" data-key="cancel">Anuluj</button>
+                    </div>
+                </form>
+            </section>
 
             <!-- SCREEN: AKTYWNY TRENING SIŁOWY -->
             <section id="screen-active-workout" class="screen">
@@ -252,7 +239,7 @@
                 </div>
             </section>
 
-            <!-- SCREEN: AKTYWNOŚĆ OGÓLNA (NOWY) -->
+            <!-- SCREEN: AKTYWNOŚĆ OGÓLNA -->
             <section id="screen-activity-workout" class="screen">
                 <div class="activity-container">
                     <div class="activity-icon">🏃</div>
@@ -282,17 +269,45 @@
                     <p data-key="stats_info">Wybierz cwiczenie aby zobaczyc jak zmienial sie Twoj ciezar w czasie. Wykres pokazuje <strong>najwiekszy ciezar</strong> z kazdego treningu dla danego cwiczenia.</p>
                 </div>
                 <div class="stats-tabs">
-                    <button class="tab-btn active" data-tab="weight-chart" data-key="weight_progress">Postep ciezaru</button>
-                    <button class="tab-btn" data-tab="volume-chart" data-key="volume">Objetosc</button>
+                    <button class="tab-btn active" data-tab="weight-chart" data-key="weight_progress">Postęp ciężaru</button>
+                    <button class="tab-btn" data-tab="volume-chart" data-key="volume">Objętość</button>
+                    <button class="tab-btn" data-tab="activity-stats" data-key="activity_stats">Aktywności</button>
                 </div>
-                <div class="form-group">
-                    <label data-key="select_exercise">Wybierz cwiczenie:</label>
+                <div class="form-group" id="exercise-select-group">
+                    <label data-key="select_exercise">Wybierz ćwiczenie:</label>
                     <select id="stats-exercise-select"></select>
                 </div>
                 <div class="chart-container">
                     <canvas id="main-chart"></canvas>
                 </div>
                 <div class="stats-summary" id="stats-summary"></div>
+                <div id="activity-stats-container" class="hidden">
+                    <div class="form-group">
+                        <label data-key="select_activity">Wybierz aktywność:</label>
+                        <select id="stats-activity-select"></select>
+                    </div>
+                    <div class="stats-period-tabs">
+                        <button class="period-btn" data-period="week" data-key="week">Tydzień</button>
+                        <button class="period-btn active" data-period="month" data-key="month">Miesiąc</button>
+                        <button class="period-btn" data-period="year" data-key="year">Rok</button>
+                        <button class="period-btn" data-period="today" data-key="today">Dziś</button>
+                    </div>
+                    <div class="stats-period-selectors" id="stats-period-selectors">
+                        <div class="form-group" id="month-selector-group">
+                            <label data-key="select_month">Miesiąc</label>
+                            <select id="stats-month-select"></select>
+                        </div>
+                        <div class="form-group" id="year-selector-group">
+                            <label data-key="select_year">Rok</label>
+                            <select id="stats-year-select"></select>
+                        </div>
+                    </div>
+                    <div class="stats-summary" id="activity-stats-summary"></div>
+                    <div class="chart-container" id="activity-chart-container">
+                        <canvas id="activity-chart"></canvas>
+                    </div>
+                    <div id="activity-list" class="history-list"></div>
+                </div>
             </section>
 
             <!-- SCREEN: POMIARY CIAŁA -->
@@ -407,7 +422,6 @@
         </div>
     </div>
 
-    <!-- FALLBACK dla adjustValue -->
     <script>
         window.adjustValue = window.adjustValue || function(id, delta) {
             var input = document.getElementById(id);
