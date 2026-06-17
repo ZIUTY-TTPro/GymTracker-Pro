@@ -1,5 +1,5 @@
 const DB_NAME = 'GymTrackerDB';
-const DB_VERSION = 2;
+const DB_VERSION = 1;
 
 let db = null;
 
@@ -14,19 +14,23 @@ function initDB() {
     };
     request.onupgradeneeded = (event) => {
       const database = event.target.result;
+      // Tworzymy tylko nowe store'y – bez otwierania dodatkowych transakcji
       if (!database.objectStoreNames.contains('exercises')) {
         const exStore = database.createObjectStore('exercises', { keyPath: 'id', autoIncrement: true });
         exStore.createIndex('name', 'name', { unique: false });
         exStore.createIndex('muscle', 'muscle', { unique: false });
+        exStore.createIndex('type', 'type', { unique: false });
       }
       if (!database.objectStoreNames.contains('workouts')) {
         const woStore = database.createObjectStore('workouts', { keyPath: 'id', autoIncrement: true });
         woStore.createIndex('name', 'name', { unique: false });
+        woStore.createIndex('type', 'type', { unique: false });
       }
       if (!database.objectStoreNames.contains('sessions')) {
         const sessStore = database.createObjectStore('sessions', { keyPath: 'id', autoIncrement: true });
         sessStore.createIndex('date', 'date', { unique: false });
         sessStore.createIndex('workoutId', 'workoutId', { unique: false });
+        sessStore.createIndex('type', 'type', { unique: false });
       }
       if (!database.objectStoreNames.contains('measurements')) {
         const msStore = database.createObjectStore('measurements', { keyPath: 'id', autoIncrement: true });
@@ -90,26 +94,38 @@ function deleteItem(storeName, id) {
   });
 }
 
+// ----- ĆWICZENIA -----
 function addExercise(exercise) {
-  return addItem('exercises', { ...exercise, createdAt: new Date().toISOString() });
+  return addItem('exercises', { 
+    ...exercise, 
+    type: exercise.type || 'strength',
+    measureDuration: exercise.measureDuration !== undefined ? exercise.measureDuration : true,
+    createdAt: new Date().toISOString() 
+  });
 }
 function getExercise(id) { return getItem('exercises', id); }
 function getAllExercises() { return getAllItems('exercises'); }
 function updateExercise(exercise) { return updateItem('exercises', exercise); }
 function deleteExercise(id) { return deleteItem('exercises', id); }
 
+// ----- TRENINGI -----
 function addWorkout(workout) {
-  return addItem('workouts', { ...workout, createdAt: new Date().toISOString() });
+  return addItem('workouts', { 
+    ...workout, 
+    type: workout.type || 'strength',
+    createdAt: new Date().toISOString() 
+  });
 }
 function getWorkout(id) { return getItem('workouts', id); }
 function getAllWorkouts() { return getAllItems('workouts'); }
 function updateWorkout(workout) { return updateItem('workouts', workout); }
 function deleteWorkout(id) { return deleteItem('workouts', id); }
 
+// ----- SESJE -----
 function addSession(session) {
   return addItem('sessions', {
     ...session,
-    date: new Date().toISOString(),
+    type: session.type || 'strength',
     createdAt: new Date().toISOString()
   });
 }
@@ -117,6 +133,7 @@ function getSession(id) { return getItem('sessions', id); }
 function getAllSessions() { return getAllItems('sessions'); }
 function deleteSession(id) { return deleteItem('sessions', id); }
 
+// ----- POMIARY -----
 function addMeasurement(measurement) {
   return addItem('measurements', { ...measurement, createdAt: new Date().toISOString() });
 }
@@ -125,6 +142,7 @@ function getAllMeasurements() { return getAllItems('measurements'); }
 function updateMeasurement(m) { return updateItem('measurements', m); }
 function deleteMeasurement(id) { return deleteItem('measurements', id); }
 
+// ----- EKSPORT / IMPORT -----
 async function exportAllData() {
   const data = {
     exercises: await getAllExercises(),
@@ -155,10 +173,12 @@ async function importAllData(jsonString) {
   if (data.measurements) for (const item of data.measurements) await addItem('measurements', item);
 }
 
+// ----- STATYSTYKI -----
 async function getExerciseStats(exerciseId) {
   const sessions = await getAllSessions();
   const stats = [];
   for (const session of sessions) {
+    if (session.type === 'activity') continue;
     if (!session.exercises) continue;
     for (const ex of session.exercises) {
       if (ex.exerciseId === exerciseId || ex.id === exerciseId) {
@@ -185,6 +205,7 @@ async function getVolumeStats() {
   const sessions = await getAllSessions();
   const volumeByDate = {};
   for (const session of sessions) {
+    if (session.type === 'activity') continue;
     if (!session.exercises) continue;
     let sessionVolume = 0;
     for (const ex of session.exercises) {
