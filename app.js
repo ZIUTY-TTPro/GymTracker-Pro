@@ -214,7 +214,7 @@ window.showScreen = function(screenId, title) {
   });
   
   const bottomNav = document.getElementById('bottom-nav');
-  const hideNavScreens = ['screen-exercise-form', 'screen-workout-form', 'screen-active-workout'];
+  const hideNavScreens = ['screen-exercise-form', 'screen-workout-form', 'screen-active-workout', 'screen-activity-workout'];
   if (bottomNav) bottomNav.classList.toggle('hidden', hideNavScreens.includes(screenId));
   
   const backBtn = document.getElementById('btn-back');
@@ -231,7 +231,11 @@ window.showScreen = function(screenId, title) {
       if (activeTab && typeof updateStatsChart === 'function') {
         updateStatsChart(activeTab.dataset.tab);
       }
-    });
+    }).catch(e => console.error('Stats error:', e));
+  }
+
+  if (screenId === 'screen-history') {
+    renderHistoryList().catch(e => console.error('History error:', e));
   }
 };
 
@@ -253,26 +257,54 @@ document.addEventListener('DOMContentLoaded', async () => {
   applyTheme();
   applyTranslations(AppState.language);
 
-  await renderExercisesList();
-  await renderWorkoutsList();
-  await renderHistoryList();
-  await renderMeasurementsHistory();
-  await renderStatsExerciseSelect();
-  await renderWorkoutExercisesSelect();
+  // Zabezpieczenie – każda funkcja może rzucić błąd, ale nie chcemy blokować reszty
+  try {
+    await renderExercisesList();
+  } catch (e) { console.error('renderExercisesList error:', e); }
+  
+// Inicjalizacja zwijania (po wyrenderowaniu listy)
+initExercisesToggle();
+  
+  try {
+    await renderWorkoutsList();
+  } catch (e) { console.error('renderWorkoutsList error:', e); }
+  
+  try {
+    await renderHistoryList();
+  } catch (e) { console.error('renderHistoryList error:', e); }
+  
+  try {
+    await renderMeasurementsHistory();
+  } catch (e) { console.error('renderMeasurementsHistory error:', e); }
+  
+  try {
+    await renderStatsExerciseSelect();
+  } catch (e) { console.error('renderStatsExerciseSelect error:', e); }
+  
+  try {
+    await renderWorkoutExercisesSelect();
+  } catch (e) { console.error('renderWorkoutExercisesSelect error:', e); }
+  
+  try {
+    await renderWorkoutActivitySelect();
+  } catch (e) { console.error('renderWorkoutActivitySelect error:', e); }
 
   const statsSelect = document.getElementById('stats-exercise-select');
   if (statsSelect && statsSelect.options.length > 1) {
     statsSelect.value = statsSelect.options[1].value;
-    await updateStatsChart('weight-chart');
+    try {
+      await updateStatsChart('weight-chart');
+    } catch (e) { console.error('updateStatsChart error:', e); }
   }
 
+  // Zawsze wywołaj setupEventListeners i showScreen
   setupEventListeners();
   showScreen('screen-home', 'GymTracker Pro');
 
   const msDate = document.getElementById('ms-date');
   if (msDate) msDate.valueAsDate = new Date();
 
-  // PRZYWROCENIE AUTOSAVE (poprawione)
+  // PRZYWROCENIE AUTOSAVE
   const saved = localStorage.getItem('gym-autosave');
   if (saved) {
     try {
@@ -337,16 +369,26 @@ function toggleDarkMode() {
   showToast(AppState.darkMode ? t('dark_mode') : t('light_mode'), 'info');
 }
 
+// W app.js w changeLanguage:
 function changeLanguage(lang) {
   AppState.language = lang;
   saveSettings();
   applyTranslations(lang);
-  renderExercisesList();
-  renderWorkoutsList();
-  renderStatsExerciseSelect();
-  renderWorkoutExercisesSelect();
-  renderHistoryList();
-  renderMeasurementsHistory();
+  
+  // Aktualizuj komunikat o wyborze aktywności
+  const hint = document.getElementById('wo-activity-hint');
+  if (hint && document.getElementById('wo-type-select')?.value === 'activity') {
+    hint.innerHTML = t('select_one_activity');
+  }
+  Promise.all([
+    renderExercisesList(),
+    renderWorkoutsList(),
+    renderStatsExerciseSelect(),
+    renderWorkoutExercisesSelect(),
+    renderWorkoutActivitySelect(),
+    renderHistoryList(),
+    renderMeasurementsHistory()
+  ]).catch(e => console.error('Change language error:', e));
   showToast(lang === 'pl' ? t('polish') : t('english'), 'success');
 }
 
@@ -378,11 +420,21 @@ function setupEventListeners() {
       showScreen('screen-home', 'GymTracker Pro');
       return;
     }
+    if (AppState.currentScreen === 'screen-activity-workout') {
+      if (typeof cancelActivity === 'function') cancelActivity();
+      return;
+    }
     showScreen('screen-home', 'GymTracker Pro');
   });
 
+  // ---- NOWE ĆWICZENIE ----
   document.getElementById('btn-new-exercise')?.addEventListener('click', () => {
-    if (typeof resetExerciseForm === 'function') resetExerciseForm();
+    console.log('btn-new-exercise clicked');
+    if (typeof resetExerciseForm === 'function') {
+      resetExerciseForm();
+    } else {
+      console.warn('resetExerciseForm not found');
+    }
     showScreen('screen-exercise-form', t('define_exercise'));
   });
 
@@ -390,19 +442,56 @@ function setupEventListeners() {
     showScreen('screen-home', 'GymTracker Pro');
   });
 
-  document.getElementById('exercise-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = document.getElementById('ex-id').value;
+  // ---- PRZEŁĄCZNIK TYPU ĆWICZENIA ----
+const exTypeSelect = document.getElementById('ex-type');
+if (exTypeSelect) {
+  exTypeSelect.addEventListener('change', () => {
+    const isActivity = exTypeSelect.value === 'activity';
+    const isStrength = exTypeSelect.value === 'strength';
+    document.getElementById('ex-strength-fields').style.display = isStrength ? 'block' : 'none';
+    document.getElementById('ex-activity-fields').style.display = isActivity ? 'block' : 'none';
+    const nameInput = document.getElementById('ex-name');
+    if (nameInput) {
+      nameInput.placeholder = isActivity ? t('activity_placeholder') : t('exercise_placeholder');
+    }
+  });
+}
+
+  // ---- ZAPIS ĆWICZENIA ----
+document.getElementById('exercise-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('ex-id').value;
+  const type = document.getElementById('ex-type').value;
+  
+  if (!type) {
+    showToast('Wybierz typ ćwiczenia', 'error');
+    return;
+  }
+    
     const exercise = {
       name: document.getElementById('ex-name').value.trim(),
-      muscle: document.getElementById('ex-muscle').value,
-      weight: parseFloat(document.getElementById('ex-weight').value) || 0,
-      reps: parseInt(document.getElementById('ex-reps').value) || 8
+      type: type
     };
+
+    if (type === 'strength') {
+      exercise.muscle = document.getElementById('ex-muscle').value;
+      exercise.weight = parseFloat(document.getElementById('ex-weight').value) || 0;
+      exercise.reps = parseInt(document.getElementById('ex-reps').value) || 8;
+      exercise.measureDuration = false;
+      exercise.note = '';
+    } else {
+      exercise.muscle = 'Aktywność ogólna';
+      exercise.weight = 0;
+      exercise.reps = 0;
+      exercise.measureDuration = document.getElementById('ex-measure-duration').checked;
+      exercise.note = document.getElementById('ex-activity-note').value.trim();
+    }
+
     if (!exercise.name) {
       showToast(t('fill_required'), 'error');
       return;
     }
+
     try {
       if (id) {
         exercise.id = parseInt(id);
@@ -412,9 +501,12 @@ function setupEventListeners() {
         await addExercise(exercise);
         showToast(t('saved'), 'success');
       }
-      await renderExercisesList();
-      await renderWorkoutsList();
-      await renderStatsExerciseSelect();
+      await Promise.all([
+        renderExercisesList(),
+        renderWorkoutsList(),
+        renderStatsExerciseSelect(),
+        renderWorkoutActivitySelect()
+      ]);
       showScreen('screen-home', 'GymTracker Pro');
     } catch (err) {
       console.error(err);
@@ -422,9 +514,20 @@ function setupEventListeners() {
     }
   });
 
+  // ---- NOWY TRENING ----
   document.getElementById('btn-new-workout')?.addEventListener('click', async () => {
-    if (typeof resetWorkoutForm === 'function') resetWorkoutForm();
-    if (typeof renderWorkoutExercisesSelect === 'function') await renderWorkoutExercisesSelect();
+    console.log('btn-new-workout clicked');
+    if (typeof resetWorkoutForm === 'function') {
+      resetWorkoutForm();
+    } else {
+      console.warn('resetWorkoutForm not found');
+    }
+    try {
+      await renderWorkoutExercisesSelect();
+      await renderWorkoutActivitySelect();
+    } catch (e) {
+      console.error('Error rendering selects:', e);
+    }
     showScreen('screen-workout-form', t('define_workout'));
   });
 
@@ -432,16 +535,37 @@ function setupEventListeners() {
     showScreen('screen-home', 'GymTracker Pro');
   });
 
-  document.getElementById('workout-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = document.getElementById('wo-id').value;
+  // ---- ZAPIS TRENINGU ----
+document.getElementById('workout-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('wo-id').value;
+  const type = document.getElementById('wo-type').value;
+  
+  if (!type) {
+    showToast('Wybierz typ treningu', 'error');
+    return;
+  }
     const name = document.getElementById('wo-name').value.trim();
-    const sets = parseInt(document.getElementById('wo-sets').value) || 4;
-    const rest = parseInt(document.getElementById('wo-rest').value) || 90;
-    const selectedExercises = [];
-    document.querySelectorAll('#wo-exercises-select input[type="checkbox"]:checked').forEach(cb => {
-      selectedExercises.push(parseInt(cb.value));
-    });
+    
+    let selectedExercises = [];
+    let workout = { name, type };
+
+    if (type === 'activity') {
+      document.querySelectorAll('#wo-activity-select input[type="checkbox"]:checked').forEach(cb => {
+        selectedExercises.push(parseInt(cb.value));
+      });
+      workout.sets = 1;
+      workout.rest = 0;
+    } else {
+      const sets = parseInt(document.getElementById('wo-sets').value) || 4;
+      const rest = parseInt(document.getElementById('wo-rest').value) || 90;
+      document.querySelectorAll('#wo-exercises-select input[type="checkbox"]:checked').forEach(cb => {
+        selectedExercises.push(parseInt(cb.value));
+      });
+      workout.sets = sets;
+      workout.rest = rest;
+    }
+
     if (!name) {
       showToast(t('fill_required'), 'error');
       return;
@@ -450,7 +574,9 @@ function setupEventListeners() {
       showToast(t('no_exercises_selected'), 'error');
       return;
     }
-    const workout = { name, sets, rest, exercises: selectedExercises };
+
+    workout.exercises = selectedExercises;
+
     try {
       if (id) {
         workout.id = parseInt(id);
@@ -468,6 +594,55 @@ function setupEventListeners() {
     }
   });
 
+// ---- PRZEŁĄCZNIK TYPU TRENINGU ----
+const woTypeSelect = document.getElementById('wo-type-select');
+if (woTypeSelect) {
+  woTypeSelect.addEventListener('change', () => {
+    const isActivity = woTypeSelect.value === 'activity';
+    const isStrength = woTypeSelect.value === 'strength';
+    
+    // Pola siłowe – widoczne tylko dla siłowego
+    document.getElementById('wo-strength-fields').style.display = isStrength ? 'block' : 'none';
+    
+    // Listy ćwiczeń
+    document.getElementById('wo-exercises-select').style.display = isStrength ? 'block' : 'none';
+    document.getElementById('wo-activity-select').style.display = isActivity ? 'block' : 'none';
+    
+    // Komunikat
+    const hint = document.getElementById('wo-activity-hint');
+    if (hint) {
+      hint.style.display = isActivity ? 'block' : 'none';
+      // Przetłumacz komunikat
+      if (isActivity) {
+        hint.innerHTML = t('select_one_activity');
+      }
+    }
+    
+    // Ukryte pole dla zapisu
+    document.getElementById('wo-type').value = woTypeSelect.value || '';
+    
+    // Placeholder
+    const nameInput = document.getElementById('wo-name');
+    if (nameInput) {
+      if (isActivity) nameInput.placeholder = t('activity_placeholder');
+      else if (isStrength) nameInput.placeholder = t('workout_placeholder');
+      else nameInput.placeholder = t('workout_placeholder');
+    }
+  });
+  // Wywołaj raz, aby ustawić początkowy stan (pusty)
+  woTypeSelect.dispatchEvent(new Event('change'));
+}
+
+  // ---- PRZYCISKI AKTYWNOŚCI ----
+  document.getElementById('btn-finish-activity')?.addEventListener('click', () => {
+    if (typeof finishActivity === 'function') finishActivity();
+  });
+
+  document.getElementById('btn-cancel-activity')?.addEventListener('click', () => {
+    if (typeof cancelActivity === 'function') cancelActivity();
+  });
+
+  // ---- AKTYWNY TRENING SIŁOWY ----
   document.getElementById('btn-pause-workout')?.addEventListener('click', () => {
     if (typeof pauseWorkout === 'function') pauseWorkout();
   });
@@ -510,19 +685,29 @@ function setupEventListeners() {
     if (typeof finishWorkout === 'function') finishWorkout();
   });
 
+  // ---- STATYSTYKI ----
   document.querySelectorAll('.stats-tabs .tab-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       document.querySelectorAll('.stats-tabs .tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      if (typeof updateStatsChart === 'function') await updateStatsChart(btn.dataset.tab);
+      if (typeof updateStatsChart === 'function') {
+        try {
+          await updateStatsChart(btn.dataset.tab);
+        } catch (e) { console.error('Stats chart error:', e); }
+      }
     });
   });
 
   document.getElementById('stats-exercise-select')?.addEventListener('change', async () => {
     const activeTab = document.querySelector('.stats-tabs .tab-btn.active');
-    if (activeTab && typeof updateStatsChart === 'function') await updateStatsChart(activeTab.dataset.tab);
+    if (activeTab && typeof updateStatsChart === 'function') {
+      try {
+        await updateStatsChart(activeTab.dataset.tab);
+      } catch (e) { console.error('Stats chart error:', e); }
+    }
   });
 
+  // ---- POMIARY ----
   document.getElementById('measurements-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const measurement = {
@@ -554,6 +739,7 @@ function setupEventListeners() {
     }
   });
 
+  // ---- USTAWIENIA ----
   document.getElementById('toggle-dark')?.addEventListener('change', (e) => {
     AppState.darkMode = e.target.checked;
     saveSettings();
@@ -564,7 +750,7 @@ function setupEventListeners() {
     changeLanguage(e.target.value);
   });
 
-  // Eksport z spinnerem
+  // ---- EKSPORT / IMPORT ----
   document.getElementById('btn-export')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-export');
     const originalText = btn.textContent;
@@ -603,7 +789,6 @@ function setupEventListeners() {
     try {
       const text = await file.text();
       
-      // Walidacja JSON przed czyszczeniem bazy
       let parsedData;
       try {
         parsedData = JSON.parse(text);
@@ -617,12 +802,15 @@ function setupEventListeners() {
 
       await importAllData(text);
       showToast(t('import_success'), 'success');
-      await renderExercisesList();
-      await renderWorkoutsList();
-      await renderHistoryList();
-      await renderMeasurementsHistory();
-      await renderStatsExerciseSelect();
-      await renderWorkoutExercisesSelect();
+      await Promise.all([
+        renderExercisesList(),
+        renderWorkoutsList(),
+        renderHistoryList(),
+        renderMeasurementsHistory(),
+        renderStatsExerciseSelect(),
+        renderWorkoutExercisesSelect(),
+        renderWorkoutActivitySelect()
+      ]);
     } catch (err) {
       console.error(err);
       const msg = (err.message.includes(t('import_error_json_format')) || err.message.includes(t('import_error_invalid_data'))) ? err.message : t('import_error');
@@ -669,7 +857,7 @@ async function updateStatsChart(tabType) {
   }
 }
 
-// BEFOREUNLOAD – ostrzeżenie przed zamknięciem strony podczas aktywnego treningu
+// BEFOREUNLOAD
 window.addEventListener('beforeunload', (e) => {
   if (window.WorkoutState && window.WorkoutState.activeWorkout && !window.WorkoutState.isPaused) {
     e.preventDefault();
