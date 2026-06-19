@@ -249,6 +249,9 @@
                         <span class="timer-icon">⏱️</span>
                         <span id="activity-timer" class="activity-timer">0:00</span>
                     </div>
+					
+					<!-- NOWY PRZYCISK DO URUCHAMIANIA STOPERA -->
+    <button id="btn-start-timer" class="btn-primary btn-large" style="margin-bottom: 12px;" data-key="start_timer">▶ Rozpocznij</button>
 
                     <div class="activity-form-group">
                         <label data-key="activity_note">Notatka</label>
@@ -421,6 +424,17 @@
             </div>
         </div>
     </div>
+	<!-- MODAL: WYBÓR TRENINGU DO DODANIA -->
+<div id="workout-select-modal" class="modal hidden">
+    <div class="modal-content">
+        <div class="modal-icon">📋</div>
+        <h3 data-key="select_workout_to_add">Wybierz trening do dodania</h3>
+        <div id="workout-select-list" style="max-height: 200px; overflow-y: auto; text-align: left; margin: 12px 0;"></div>
+        <div class="modal-buttons">
+            <button id="workout-select-cancel" class="modal-btn modal-btn-cancel" data-key="cancel">Anuluj</button>
+        </div>
+    </div>
+</div>
 
     <script>
         window.adjustValue = window.adjustValue || function(id, delta) {
