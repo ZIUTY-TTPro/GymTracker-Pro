@@ -421,6 +421,11 @@ window.ActivityState = {
   seconds: 0
 };
 
+window.ActivityTimerState = {
+  isRunning: false,
+  isPaused: false
+};
+
 function resetActivityState() {
   window.ActivityState.activeActivity = null;
   window.ActivityState.startTime = null;
@@ -449,6 +454,7 @@ async function startActivity(workoutId) {
   }
 
   resetActivityState();
+  resetActivityTimer();
 
   window.ActivityState.activeActivity = {
     workoutId: workout.id,
@@ -457,19 +463,22 @@ async function startActivity(workoutId) {
     exerciseName: exercise.name,
     measureDuration: exercise.measureDuration !== false,
     note: '',
-    startTime: new Date().toISOString()
+    startTime: null
   };
 
   document.getElementById('activity-name').textContent = exercise.name;
   document.getElementById('activity-timer').textContent = '0:00';
   document.getElementById('activity-note-input').value = '';
 
+  const btn = document.getElementById('btn-start-timer');
+  if (btn) {
+    btn.textContent = t('start_timer');
+    btn.style.background = '';
+    btn.style.display = 'block';
+  }
+
   showScreen('screen-activity-workout', exercise.name);
   showToast(t('activity_started'), 'success');
-
-  if (window.ActivityState.activeActivity.measureDuration) {
-    startActivityTimer();
-  }
 
   document.getElementById('activity-note-input').addEventListener('input', (e) => {
     if (window.ActivityState.activeActivity) {
@@ -518,15 +527,15 @@ async function finishActivity() {
     workoutId: window.ActivityState.activeActivity.workoutId,
     workoutName: window.ActivityState.activeActivity.workoutName,
     type: 'activity',
-    startTime: window.ActivityState.activeActivity.startTime,
+    startTime: window.ActivityState.activeActivity.startTime || new Date().toISOString(),
     endTime: new Date().toISOString(),
-    duration: window.ActivityState.seconds,
+    duration: window.ActivityState.seconds || 0,
     date: new Date().toLocaleDateString('fr-CA'),
     exercises: [{
       exerciseId: window.ActivityState.activeActivity.exerciseId,
       name: window.ActivityState.activeActivity.exerciseName,
       type: 'activity',
-      duration: window.ActivityState.seconds,
+      duration: window.ActivityState.seconds || 0,
       note: window.ActivityState.activeActivity.note || '',
       completed: true
     }]
@@ -541,6 +550,7 @@ async function finishActivity() {
   }
 
   resetActivityState();
+  resetActivityTimer();
   renderWorkoutsList();
   renderHistoryList();
   showScreen('screen-home', 'GymTracker Pro');
@@ -553,8 +563,40 @@ function cancelActivity() {
   if (!confirmed) return;
 
   stopActivityTimer();
+  resetActivityTimer();
   resetActivityState();
   showScreen('screen-home', 'GymTracker Pro');
+}
+
+// ============================================
+// STEROWANIE STOPEREM AKTYWNOŚCI
+// ============================================
+function toggleActivityTimer() {
+  const btn = document.getElementById('btn-start-timer');
+  if (!btn) return;
+  
+  if (window.ActivityState.timerInterval) {
+    stopActivityTimer();
+    btn.textContent = t('resume_timer');
+    btn.style.background = 'var(--success)';
+  } else {
+    startActivityTimer();
+    btn.textContent = t('stop_timer');
+    btn.style.background = 'var(--danger)';
+  }
+}
+
+function resetActivityTimer() {
+  stopActivityTimer();
+  window.ActivityState.seconds = 0;
+  window.ActivityState.startTime = null;
+  const timerEl = document.getElementById('activity-timer');
+  if (timerEl) timerEl.textContent = '0:00';
+  const btn = document.getElementById('btn-start-timer');
+  if (btn) {
+    btn.textContent = t('start_timer');
+    btn.style.background = '';
+  }
 }
 
 // ============================================
@@ -1094,10 +1136,14 @@ async function finishWorkout() {
   }
 
   renderWorkoutsList();
-  renderHistoryList();
+  renderHistoryList(); // odświeża listę
+  
+  // === TO JEST KLUCZOWE – ODŚWIEŻ KALENDARZ ===
+  await loadSessionsData();
+  renderCalendar(currentCalendarYear, currentCalendarMonth);
+  
   showScreen('screen-home', 'GymTracker Pro');
 }
-
 // --- MEASUREMENTS ---
 async function renderMeasurementsHistory() {
   const container = document.getElementById('measurements-history');
@@ -1167,10 +1213,8 @@ async function renderStatsExerciseSelect() {
     });
   }
   
-  // ZAWSZE ustaw wartość na pustą
   select.value = '';
   
-  // Wyczyść statystyki
   if (typeof renderStatsChart === 'function') {
     renderStatsChart('weight-chart', [], [], t('select_exercise'));
   }
@@ -1235,96 +1279,270 @@ function renderCalendar(year, month) {
   const monthYear = document.getElementById('calendar-month-year');
   if (!grid || !monthYear) return;
 
-  const lang = localStorage.getItem('gym-lang') || 'pl';
-  const months = translations[lang]?.months || translations['pl'].months;
-  const weekdaysShort = translations[lang]?.weekdays_short || translations['pl'].weekdays_short;
+  // === POBRANIE DANYCH NA ŻYWO Z BAZY ===
+  getAllSessions().then(sessions => {
+    const sessionsData = {};
+    sessions.forEach(session => {
+      const dateKey = session.date.split('T')[0];
+      if (!sessionsData[dateKey]) sessionsData[dateKey] = [];
+      sessionsData[dateKey].push(session);
+    });
 
-  const date = new Date(year, month);
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const lang = localStorage.getItem('gym-lang') || 'pl';
+    const months = translations[lang]?.months || translations['pl'].months;
+    const weekdaysShort = translations[lang]?.weekdays_short || translations['pl'].weekdays_short;
 
-  const monthNames = Object.values(months);
-  monthYear.textContent = `${monthNames[month]} ${year}`;
+    const date = new Date(year, month);
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-  const weekdaysEl = document.querySelector('.calendar-weekdays');
-  if (weekdaysEl) {
-    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    weekdaysEl.innerHTML = days.map(d => `<span>${weekdaysShort[d]}</span>`).join('');
-  }
+    const monthNames = Object.values(months);
+    monthYear.textContent = `${monthNames[month]} ${year}`;
 
-  let startOffset = (firstDay === 0) ? 6 : firstDay - 1;
-  grid.innerHTML = '';
-
-  for (let i = 0; i < startOffset; i++) {
-    const empty = document.createElement('div');
-    empty.className = 'calendar-day other-month';
-    grid.appendChild(empty);
-  }
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const isToday = dateStr === todayStr;
-
-    const dayDiv = document.createElement('div');
-    dayDiv.className = 'calendar-day';
-    if (isToday) dayDiv.classList.add('today');
-
-    const sessions = sessionsData[dateStr] || [];
-    if (sessions.length > 0) {
-      dayDiv.classList.add('has-workout');
+    const weekdaysEl = document.querySelector('.calendar-weekdays');
+    if (weekdaysEl) {
+      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      weekdaysEl.innerHTML = days.map(d => `<span>${weekdaysShort[d]}</span>`).join('');
     }
 
-    const numberSpan = document.createElement('span');
-    numberSpan.className = 'day-number';
-    numberSpan.textContent = day;
-    dayDiv.appendChild(numberSpan);
+    let startOffset = (firstDay === 0) ? 6 : firstDay - 1;
+    grid.innerHTML = '';
 
-    if (sessions.length > 0) {
-      const dotsContainer = document.createElement('div');
-      dotsContainer.className = 'day-dots';
-      
-      const hasActivity = sessions.some(s => s.type === 'activity');
-      
-      if (hasActivity) {
-        const icon = document.createElement('span');
-        icon.className = 'activity-icon-small';
-        icon.textContent = '🏃';
-        dotsContainer.appendChild(icon);
+    for (let i = 0; i < startOffset; i++) {
+      const empty = document.createElement('div');
+      empty.className = 'calendar-day other-month';
+      grid.appendChild(empty);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const isToday = dateStr === todayStr;
+
+      const dayDiv = document.createElement('div');
+      dayDiv.className = 'calendar-day';
+      if (isToday) dayDiv.classList.add('today');
+
+      const sessions = sessionsData[dateStr] || [];
+      if (sessions.length > 0) {
+        dayDiv.classList.add('has-workout');
       }
-      
-      const muscleSet = new Set();
-      sessions.forEach(session => {
-        if (session.type === 'activity') return;
-        if (session.exercises) {
-          session.exercises.forEach(ex => {
-            if (ex.muscle) muscleSet.add(ex.muscle);
-          });
+
+      const numberSpan = document.createElement('span');
+      numberSpan.className = 'day-number';
+      numberSpan.textContent = day;
+      dayDiv.appendChild(numberSpan);
+
+      if (sessions.length > 0) {
+        const dotsContainer = document.createElement('div');
+        dotsContainer.className = 'day-dots';
+        
+        const hasActivity = sessions.some(s => s.type === 'activity');
+        if (hasActivity) {
+          const icon = document.createElement('span');
+          icon.className = 'activity-icon-small';
+          icon.textContent = '🏃';
+          dotsContainer.appendChild(icon);
         }
-      });
-      
-      muscleSet.forEach(muscle => {
-        const dot = document.createElement('span');
-        dot.className = 'dot';
-        dot.style.backgroundColor = getMuscleColor(muscle);
-        dotsContainer.appendChild(dot);
-      });
-      
-      dayDiv.appendChild(dotsContainer);
-    }
+        
+        const muscleSet = new Set();
+        sessions.forEach(session => {
+          if (session.type === 'activity') return;
+          if (session.exercises) {
+            session.exercises.forEach(ex => {
+              if (ex.muscle) muscleSet.add(ex.muscle);
+            });
+          }
+        });
+        
+        muscleSet.forEach(muscle => {
+          const dot = document.createElement('span');
+          dot.className = 'dot';
+          dot.style.backgroundColor = getMuscleColor(muscle);
+          dotsContainer.appendChild(dot);
+        });
+        
+        dayDiv.appendChild(dotsContainer);
+      }
 
-    if (sessions.length > 0) {
+      // KAŻDY DZIEŃ JEST KLIKALNY
       dayDiv.addEventListener('click', () => showDayDetails(dateStr));
+
+      grid.appendChild(dayDiv);
     }
 
-    grid.appendChild(dayDiv);
-  }
-
-  currentCalendarYear = year;
-  currentCalendarMonth = month;
+    currentCalendarYear = year;
+    currentCalendarMonth = month;
+  });
 }
 
+// ============================================
+// DODAWANIE TRENINGU Z KALENDARZA
+// ============================================
+async function addWorkoutToDay(dateStr) {
+  const workouts = await getAllWorkouts();
+  if (workouts.length === 0) {
+    showToast(t('no_workouts_to_add'), 'error');
+    return;
+  }
+
+  // Pokaż modal z listą treningów
+  const modal = document.getElementById('workout-select-modal');
+  const listContainer = document.getElementById('workout-select-list');
+  if (!modal || !listContainer) {
+    // Fallback do prompt jeśli modal nie istnieje
+    const options = workouts.map((wo, i) => 
+      `${i + 1}. ${wo.name}${wo.type === 'activity' ? ' 🏃' : ''}`
+    ).join('\n');
+    const choice = prompt(t('select_workout_to_add') + ':\n' + options);
+    if (choice === null) return;
+    const index = parseInt(choice) - 1;
+    if (isNaN(index) || index < 0 || index >= workouts.length) {
+      showToast(t('error'), 'error');
+      return;
+    }
+    await addWorkoutToDayByIndex(dateStr, index);
+    return;
+  }
+
+  // Przygotuj listę
+  listContainer.innerHTML = '';
+  workouts.forEach((wo, index) => {
+    const div = document.createElement('div');
+    div.style.cssText = `
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: 0.15s;
+    `;
+    div.innerHTML = `
+      <span>${escapeHtml(wo.name)}</span>
+      <span style="font-size: 0.7rem; color: var(--text-secondary);">${wo.type === 'activity' ? '🏃' : '💪'}</span>
+    `;
+    div.addEventListener('click', () => {
+      modal.classList.add('hidden');
+      addWorkoutToDayByIndex(dateStr, index);
+    });
+    div.addEventListener('mouseenter', () => {
+      div.style.background = 'var(--surface-hover)';
+    });
+    div.addEventListener('mouseleave', () => {
+      div.style.background = 'transparent';
+    });
+    listContainer.appendChild(div);
+  });
+
+  modal.classList.remove('hidden');
+
+  // Anuluj
+  document.getElementById('workout-select-cancel')?.addEventListener('click', () => {
+    modal.classList.add('hidden');
+  });
+  // Kliknięcie w tło
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.classList.add('hidden');
+  });
+}
+
+async function addWorkoutToDayByIndex(dateStr, index) {
+  const workouts = await getAllWorkouts();
+  if (index < 0 || index >= workouts.length) {
+    showToast(t('error'), 'error');
+    return;
+  }
+  
+  const workout = workouts[index];
+  
+  const sessions = await getAllSessions();
+  const existing = sessions.filter(s => {
+    const sDate = s.date.split('T')[0];
+    return sDate === dateStr && s.workoutId === workout.id;
+  });
+  
+  if (existing.length > 0) {
+    showToast('Trening już istnieje w tym dniu', 'info');
+    return;
+  }
+  
+  let exercises = [];
+  
+  if (workout.type === 'activity') {
+    const exId = workout.exercises?.[0];
+    if (exId) {
+      const ex = await getExercise(exId);
+      exercises = [{
+        exerciseId: exId,
+        name: ex ? ex.name : 'Aktywność',
+        type: 'activity',
+        duration: 0,
+        note: '',
+        completed: true
+      }];
+    }
+  } else {
+    if (workout.exercises) {
+      const allExercises = await getAllExercises();
+      exercises = workout.exercises.map(exId => {
+        const ex = allExercises.find(e => e.id === exId);
+        const defaultWeight = ex ? ex.weight || 0 : 0;
+        const defaultReps = ex ? ex.reps || 8 : 8;
+        const sets = [];
+        for (let i = 0; i < (workout.sets || 4); i++) {
+          sets.push({
+            weight: defaultWeight,
+            reps: defaultReps,
+            completed: true
+          });
+        }
+        return {
+          exerciseId: exId,
+          name: ex ? ex.name : 'Ćwiczenie',
+          type: 'strength',
+          muscle: ex ? ex.muscle : 'Inne', // <--- TO JEST KLUCZOWE
+          sets: sets
+        };
+      });
+    }
+  }
+  
+  const session = {
+    workoutId: workout.id,
+    workoutName: workout.name,
+    type: workout.type || 'strength',
+    startTime: new Date(dateStr + 'T12:00:00').toISOString(),
+    endTime: new Date(dateStr + 'T13:00:00').toISOString(),
+    duration: 0,
+    totalSets: workout.sets || 0,
+    date: dateStr,
+    exercises: exercises
+  };
+  
+  try {
+    const newSessionId = await addSession(session);
+    session.id = newSessionId;
+    
+    if (!sessionsData[dateStr]) {
+      sessionsData[dateStr] = [];
+    }
+    sessionsData[dateStr].push(session);
+    
+    showToast(t('workout_added_to_day'), 'success');
+    
+    const modal = document.getElementById('workout-select-modal');
+    if (modal) modal.classList.add('hidden');
+    
+    renderCalendar(currentCalendarYear, currentCalendarMonth);
+    showDayDetails(dateStr);
+    
+  } catch (e) {
+    console.error(e);
+    showToast(t('error'), 'error');
+  }
+}
 async function showDayDetails(dateStr) {
   const container = document.getElementById('day-details');
   if (!container) return;
@@ -1334,11 +1552,7 @@ async function showDayDetails(dateStr) {
   const months = translations[lang]?.months || translations['pl'].months;
 
   const sessions = sessionsData[dateStr] || [];
-  if (sessions.length === 0) {
-    container.innerHTML = `<div class="no-workouts">${t('no_workouts_this_day')}</div>`;
-    return;
-  }
-
+  
   const dateObj = new Date(dateStr + 'T00:00:00');
   const dayName = weekdays[['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][dateObj.getDay()]];
   const monthName = Object.values(months)[dateObj.getMonth()];
@@ -1347,9 +1561,25 @@ async function showDayDetails(dateStr) {
   let html = `
     <div class="detail-header">
       <span class="detail-date">${formattedDate}</span>
-      <button class="detail-close" id="detail-close">×</button>
+      <div>
+        <button id="add-workout-to-day" class="btn-secondary" style="padding: 4px 10px; font-size: 0.7rem; margin-right: 6px;" data-key="add_workout_to_day">+ Dodaj trening</button>
+        <button class="detail-close" id="detail-close">×</button>
+      </div>
     </div>
   `;
+
+  if (sessions.length === 0) {
+    html += `<div class="no-workouts">${t('no_workouts_this_day')}</div>`;
+    container.innerHTML = html;
+    
+    document.getElementById('add-workout-to-day')?.addEventListener('click', () => {
+      addWorkoutToDay(dateStr);
+    });
+    document.getElementById('detail-close')?.addEventListener('click', () => {
+      container.innerHTML = '';
+    });
+    return;
+  }
 
   sessions.forEach((session) => {
     const isActivity = session.type === 'activity';
@@ -1396,6 +1626,11 @@ async function showDayDetails(dateStr) {
   });
 
   container.innerHTML = html;
+
+  // NASŁUCHIWACZ DLA PRZYCISKU "DODAJ TRENING" – ZAWSZE
+  document.getElementById('add-workout-to-day')?.addEventListener('click', () => {
+    addWorkoutToDay(dateStr);
+  });
 
   document.getElementById('detail-close')?.addEventListener('click', () => {
     container.innerHTML = '';
@@ -1492,7 +1727,7 @@ function initExercisesToggle() {
 }
 
 /* ============================================
-   STATYSTYKI AKTYWNOŚCI - Z PEŁNYM WYBOREM OKRESU
+   STATYSTYKI AKTYWNOŚCI
    ============================================ */
 
 let activityChart = null;
@@ -1510,7 +1745,6 @@ async function renderActivityStats() {
   
   container.style.display = 'block';
   
-  // === CZYŚCIMY STATYSTYKI – na wypadek gdyby zostały z poprzedniego stanu ===
   summaryContainer.innerHTML = '';
   listContainer.innerHTML = '';
   if (activityChart) {
@@ -1542,11 +1776,9 @@ async function renderActivityStats() {
     activitySelect.appendChild(opt);
   });
   
-  // Nie ustawiamy automatycznie aktywności – czekamy na wybór użytkownika
   activitySelect.value = '';
   currentActivityId = null;
   
-  // Aktualizacja zakresu lat na podstawie sesji
   await updateYearRange();
   
   activitySelect.onchange = () => {
@@ -1554,7 +1786,6 @@ async function renderActivityStats() {
     if (currentActivityId) {
       updateActivityStats();
     } else {
-      // Wyczyść statystyki po odznaczeniu
       summaryContainer.innerHTML = '';
       listContainer.innerHTML = '';
       if (activityChart) {
@@ -1564,7 +1795,6 @@ async function renderActivityStats() {
     }
   };
   
-  // Obsługa przycisków okresu
   document.querySelectorAll('.period-btn').forEach(btn => {
     btn.onclick = () => {
       document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
@@ -1589,10 +1819,7 @@ async function renderActivityStats() {
     };
   });
   
-  // Inicjalizacja selectorów dla miesięcy i lat
   initPeriodSelectors();
-  
-  // ZMIANA: Usunięto wymuszenie display = 'flex' na starcie dla elementu 'stats-period-selectors'
 }
 
 async function updateYearRange() {
@@ -1609,7 +1836,6 @@ async function updateYearRange() {
     if (year > maxYear) maxYear = year;
   });
   
-  // Jeśli nie ma sesji, ustaw bieżący rok
   if (sessions.length === 0) {
     minYear = maxYear = new Date().getFullYear();
   }
@@ -1622,7 +1848,6 @@ async function updateYearRange() {
     yearSelect.appendChild(opt);
   }
   
-  // Ustaw bieżący rok (lub najnowszy jeśli bieżący jest poza zakresem)
   const currentYear = new Date().getFullYear();
   if (yearSelect.querySelector(`option[value="${currentYear}"]`)) {
     yearSelect.value = currentYear;
@@ -1637,7 +1862,6 @@ function initPeriodSelectors() {
   
   if (!monthSelect || !yearSelect) return;
   
-  // Pobierz nazwy miesięcy z tłumaczeń
   const lang = localStorage.getItem('gym-lang') || 'pl';
   const monthNames = Object.values(translations[lang]?.months || translations['pl'].months);
   
@@ -1649,16 +1873,13 @@ function initPeriodSelectors() {
     monthSelect.appendChild(opt);
   });
   
-  // Ustaw bieżący miesiąc
   const now = new Date();
   monthSelect.value = now.getMonth();
   
-  // Rok już jest ustawiony przez updateYearRange
   if (!yearSelect.value) {
     yearSelect.value = now.getFullYear();
   }
   
-  // Nasłuchiwacze
   monthSelect.onchange = () => {
     const selectedYear = parseInt(yearSelect.value) || new Date().getFullYear();
     const selectedMonth = parseInt(monthSelect.value);
@@ -1871,14 +2092,11 @@ function switchStatsTab(tabType) {
     if (chartContainer) chartContainer.classList.add('hidden');
     if (activityChartContainer) activityChartContainer.classList.remove('hidden');
     
-    // === RESET stanu aktywności przed wyrenderowaniem ===
     currentActivityId = null; 
     currentActivityPeriod = null;
     
-    // Usuwamy podświetlenie z przycisków okresu (Dzień, Miesiąc, Rok)
     document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
     
-    // Ukrywamy selektory okresów (np. strzałki wyboru miesiąca/roku) na start
     const selectors = document.getElementById('stats-period-selectors');
     if (selectors) selectors.style.display = 'none';
 
@@ -1890,13 +2108,11 @@ function switchStatsTab(tabType) {
     if (chartContainer) chartContainer.classList.remove('hidden');
     if (activityChartContainer) activityChartContainer.classList.add('hidden');
     
-    // === RESET SELEKTORA I CZYSZCZENIE WYKRESU ===
     const select = document.getElementById('stats-exercise-select');
     if (select) {
-      select.value = ''; // Reset do "Wybierz ćwiczenie"
+      select.value = '';
     }
     
-    // Wyczyść wykres i statystyki
     if (typeof renderStatsChart === 'function') {
       renderStatsChart(tabType === 'weight-chart' ? 'weight-chart' : 'volume-chart', [], [], t('select_exercise'));
     }
