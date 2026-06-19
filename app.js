@@ -611,6 +611,11 @@ function setupEventListeners() {
       showToast(t('error'), 'error');
     }
   });
+  
+// ---- PRZYCISK START/STOP STOPERA ----
+document.getElementById('btn-start-timer')?.addEventListener('click', () => {
+  if (typeof toggleActivityTimer === 'function') toggleActivityTimer();
+});
 
   const woTypeSelect = document.getElementById('wo-type-select');
   if (woTypeSelect) {
