@@ -222,3 +222,134 @@ async function getVolumeStats() {
     .map(([date, volume]) => ({ date, volume }))
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 }
+// ============================================
+// AUTO-BACKUP DO localStorage (warstwa awaryjna)
+// ============================================
+
+const BACKUP_KEY = 'gymtracker_backup';
+
+async function saveBackupToLocalStorage() {
+  try {
+    const data = {
+      exercises: await getAllExercises(),
+      workouts: await getAllWorkouts(),
+      sessions: await getAllSessions(),
+      measurements: await getAllMeasurements(),
+      timestamp: Date.now(),
+      version: DB_VERSION
+    };
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(data));
+    console.log('📦 Kopia zapasowa zapisana w localStorage');
+  } catch (e) {
+    console.warn('Nie udało się zapisać kopii w localStorage:', e);
+  }
+}
+
+async function restoreFromLocalStorage() {
+  try {
+    const raw = localStorage.getItem(BACKUP_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    
+    // Sprawdź czy backup jest świeży (np. z ostatnich 30 dni)
+    if (Date.now() - data.timestamp > 30 * 24 * 60 * 60 * 1000) {
+      console.log('⏳ Backup jest starszy niż 30 dni – pomijam');
+      return false;
+    }
+    
+    // Importuj dane z backupu
+    const stores = ['exercises', 'workouts', 'sessions', 'measurements'];
+    for (const storeName of stores) {
+      const tx = db.transaction([storeName], 'readwrite');
+      const store = tx.objectStore(storeName);
+      await new Promise((resolve, reject) => {
+        const req = store.clear();
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    }
+    if (data.exercises) for (const item of data.exercises) await addItem('exercises', item);
+    if (data.workouts) for (const item of data.workouts) await addItem('workouts', item);
+    if (data.sessions) for (const item of data.sessions) await addItem('sessions', item);
+    if (data.measurements) for (const item of data.measurements) await addItem('measurements', item);
+    
+    console.log('♻️ Przywrócono dane z localStorage backup');
+    return true;
+  } catch (e) {
+    console.warn('Nie udało się przywrócić z localStorage:', e);
+    return false;
+  }
+}
+
+// Wywołuj po każdej zmianie danych
+const originalAddExercise = addExercise;
+const originalUpdateExercise = updateExercise;
+const originalDeleteExercise = deleteExercise;
+const originalAddWorkout = addWorkout;
+const originalUpdateWorkout = updateWorkout;
+const originalDeleteWorkout = deleteWorkout;
+const originalAddSession = addSession;
+const originalDeleteSession = deleteSession;
+const originalAddMeasurement = addMeasurement;
+const originalDeleteMeasurement = deleteMeasurement;
+
+// Nadpisujemy funkcje, aby automatycznie robiły backup
+addExercise = async function(exercise) {
+  const result = await originalAddExercise(exercise);
+  await saveBackupToLocalStorage();
+  return result;
+};
+
+updateExercise = async function(exercise) {
+  const result = await originalUpdateExercise(exercise);
+  await saveBackupToLocalStorage();
+  return result;
+};
+
+deleteExercise = async function(id) {
+  const result = await originalDeleteExercise(id);
+  await saveBackupToLocalStorage();
+  return result;
+};
+
+addWorkout = async function(workout) {
+  const result = await originalAddWorkout(workout);
+  await saveBackupToLocalStorage();
+  return result;
+};
+
+updateWorkout = async function(workout) {
+  const result = await originalUpdateWorkout(workout);
+  await saveBackupToLocalStorage();
+  return result;
+};
+
+deleteWorkout = async function(id) {
+  const result = await originalDeleteWorkout(id);
+  await saveBackupToLocalStorage();
+  return result;
+};
+
+addSession = async function(session) {
+  const result = await originalAddSession(session);
+  await saveBackupToLocalStorage();
+  return result;
+};
+
+deleteSession = async function(id) {
+  const result = await originalDeleteSession(id);
+  await saveBackupToLocalStorage();
+  return result;
+};
+
+addMeasurement = async function(measurement) {
+  const result = await originalAddMeasurement(measurement);
+  await saveBackupToLocalStorage();
+  return result;
+};
+
+deleteMeasurement = async function(id) {
+  const result = await originalDeleteMeasurement(id);
+  await saveBackupToLocalStorage();
+  return result;
+};
