@@ -1301,7 +1301,6 @@ function renderCalendar(year, month) {
   const monthYear = document.getElementById('calendar-month-year');
   if (!grid || !monthYear) return;
 
-  // === POBRANIE DANYCH NA ŻYWO Z BAZY ===
   getAllSessions().then(sessions => {
     const sessionsData = {};
     sessions.forEach(session => {
@@ -1388,44 +1387,18 @@ function renderCalendar(year, month) {
         dayDiv.appendChild(dotsContainer);
       }
 
-      // KAŻDY DZIEŃ JEST KLIKALNY
       dayDiv.addEventListener('click', () => showDayDetails(dateStr));
-
       grid.appendChild(dayDiv);
     }
 
     currentCalendarYear = year;
     currentCalendarMonth = month;
 
-    // Nawigacja – musimy ją ponownie podpiąć, bo przyciski są poza gridem
-    document.getElementById('calendar-prev')?.addEventListener('click', () => {
-      if (currentCalendarMonth === 0) {
-        currentCalendarMonth = 11;
-        currentCalendarYear--;
-      } else {
-        currentCalendarMonth--;
-      }
-      renderCalendar(currentCalendarYear, currentCalendarMonth);
-    });
-
-    document.getElementById('calendar-next')?.addEventListener('click', () => {
-      if (currentCalendarMonth === 11) {
-        currentCalendarMonth = 0;
-        currentCalendarYear++;
-      } else {
-        currentCalendarMonth++;
-      }
-      renderCalendar(currentCalendarYear, currentCalendarMonth);
-    });
-
-    document.getElementById('calendar-today')?.addEventListener('click', () => {
-      const now = new Date();
-      currentCalendarYear = now.getFullYear();
-      currentCalendarMonth = now.getMonth();
-      renderCalendar(currentCalendarYear, currentCalendarMonth);
-      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      showDayDetails(todayStr);
-    });
+    // Inicjalizacja nawigacji (tylko raz)
+    if (!window._calendarNavInitialized) {
+      initCalendarNavigation();
+      window._calendarNavInitialized = true;
+    }
   });
 }
 
@@ -1731,25 +1704,55 @@ async function showDayDetails(dateStr) {
 }
 
 function initCalendarNavigation() {
-  document.getElementById('calendar-prev')?.addEventListener('click', () => {
-    if (currentCalendarMonth === 0) {
-      currentCalendarMonth = 11;
-      currentCalendarYear--;
-    } else {
-      currentCalendarMonth--;
-    }
-    renderCalendar(currentCalendarYear, currentCalendarMonth);
-  });
+  const prevBtn = document.getElementById('calendar-prev');
+  const nextBtn = document.getElementById('calendar-next');
+  const todayBtn = document.getElementById('calendar-today');
 
-  document.getElementById('calendar-next')?.addEventListener('click', () => {
-    if (currentCalendarMonth === 11) {
-      currentCalendarMonth = 0;
-      currentCalendarYear++;
-    } else {
-      currentCalendarMonth++;
-    }
-    renderCalendar(currentCalendarYear, currentCalendarMonth);
-  });
+  if (prevBtn) {
+    const newPrev = prevBtn.cloneNode(true);
+    prevBtn.parentNode.replaceChild(newPrev, prevBtn);
+    newPrev.addEventListener('click', () => {
+      if (currentCalendarMonth === 0) {
+        currentCalendarMonth = 11;
+        currentCalendarYear--;
+      } else {
+        currentCalendarMonth--;
+      }
+      renderCalendar(currentCalendarYear, currentCalendarMonth);
+    });
+  }
+
+  if (nextBtn) {
+    const newNext = nextBtn.cloneNode(true);
+    nextBtn.parentNode.replaceChild(newNext, nextBtn);
+    newNext.addEventListener('click', () => {
+      if (currentCalendarMonth === 11) {
+        currentCalendarMonth = 0;
+        currentCalendarYear++;
+      } else {
+        currentCalendarMonth++;
+      }
+      renderCalendar(currentCalendarYear, currentCalendarMonth);
+    });
+  }
+
+  if (todayBtn) {
+    const newToday = todayBtn.cloneNode(true);
+    todayBtn.parentNode.replaceChild(newToday, todayBtn);
+    
+    // Tłumaczenie przycisku "Dziś"
+    const todayKey = newToday.getAttribute('data-key') || 'today';
+    newToday.textContent = t(todayKey);
+    
+    newToday.addEventListener('click', () => {
+      const now = new Date();
+      currentCalendarYear = now.getFullYear();
+      currentCalendarMonth = now.getMonth();
+      renderCalendar(currentCalendarYear, currentCalendarMonth);
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      showDayDetails(todayStr);
+    });
+  }
 }
 
 window.renderHistoryList = async function() {
