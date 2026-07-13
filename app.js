@@ -270,6 +270,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     showToast(t('database_error'), 'error');
   }
 
+  // ============================================
+  // PRZYWRACANIE DANYCH Z LOCALSTORAGE (BACKUP)
+  // ============================================
+  try {
+    const exercises = await getAllExercises();
+    if (exercises.length === 0) {
+      const restored = await restoreFromLocalStorage();
+      if (restored) {
+        showToast('♻️ Przywrócono dane z automatycznej kopii zapasowej', 'success');
+      }
+    }
+  } catch (e) {
+    console.warn('Przywracanie z backupu nie powiodło się:', e);
+  }
+
   applyTheme();
   applyTranslations(AppState.language);
 
