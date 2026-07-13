@@ -259,3 +259,35 @@ document.body.addEventListener('pointerdown', function unlockAudio() {
   // Usuwamy nasłuchiwacz po pierwszym uruchomieniu, żeby nie obciążać aplikacji
   document.body.removeEventListener('pointerdown', unlockAudio);
 }, { once: true });
+
+// ============================================
+// STEROWANIE STOPEREM AKTYWNOŚCI
+// ============================================
+
+function toggleActivityTimer() {
+  const btn = document.getElementById('btn-start-timer');
+  if (!btn) return;
+  
+  if (window.ActivityState.timerInterval) {
+    stopActivityTimer();
+    btn.textContent = t('resume_timer');
+    btn.style.background = 'var(--success)';
+  } else {
+    startActivityTimer();
+    btn.textContent = t('stop_timer');
+    btn.style.background = 'var(--danger)';
+  }
+}
+
+function resetActivityTimer() {
+  stopActivityTimer();
+  window.ActivityState.seconds = 0;
+  window.ActivityState.startTime = null;
+  const timerEl = document.getElementById('activity-timer');
+  if (timerEl) timerEl.textContent = '0:00';
+  const btn = document.getElementById('btn-start-timer');
+  if (btn) {
+    btn.textContent = t('start_timer');
+    btn.style.background = '';
+  }
+}
