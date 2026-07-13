@@ -682,6 +682,9 @@ async function startWorkout(workoutId) {
   showToast(t('workout_started'), 'success');
 
   window.WorkoutState.save();
+
+  // Wake Lock – włączamy
+  requestWakeLock();
 }
 
 function renderActiveWorkout() {
@@ -1073,21 +1076,18 @@ function showConfirmModal(options) {
 async function finishWorkout() {
   if (!window.WorkoutState.activeWorkout) return;
 
-  const isReadyToFinish = window.WorkoutState.isLastRoundReady;
-  const allCompleted = window.WorkoutState.activeWorkout.exercises.every(ex => ex.rounds[window.WorkoutState.currentRound].completed);
   const isLastRound = (window.WorkoutState.currentRound + 1 === window.WorkoutState.activeWorkout.totalSets);
-
-  if (isLastRound && !isReadyToFinish && !allCompleted) {
-    await showConfirmModal({
-      title: '❌ ' + t('cannot_finish'),
-      message: t('check_all_exercises_to_finish')
-    });
-    return;
+  const doneCount = window.WorkoutState.activeWorkout.exercises.filter(ex => ex.rounds[window.WorkoutState.currentRound].completed).length;
+  const total = window.WorkoutState.activeWorkout.exercises.length;
+  
+  let message = '';
+  if (isLastRound && doneCount < total) {
+    message = `Wykonano ${doneCount} z ${total} ćwiczeń w ostatniej rundzie. Czy na pewno chcesz zakończyć trening?`;
   }
 
   const confirmed = await showConfirmModal({
     title: '🏁 ' + t('confirm_finish_workout'),
-    message: ''
+    message: message || ''
   });
 
   if (!confirmed) return;
@@ -1121,6 +1121,9 @@ async function finishWorkout() {
     showToast(t('error'), 'error');
   }
 
+  // Zwolnij Wake Lock
+  releaseWakeLock();
+
   window.WorkoutState.reset();
   window.WorkoutState.save();
 
@@ -1136,12 +1139,31 @@ async function finishWorkout() {
   }
 
   renderWorkoutsList();
-  renderHistoryList(); // odświeża listę
-  
-  // === TO JEST KLUCZOWE – ODŚWIEŻ KALENDARZ ===
   await loadSessionsData();
   renderCalendar(currentCalendarYear, currentCalendarMonth);
   
+  // 🔥 Zapytaj o kopię zapasową
+  const shouldBackup = await showConfirmModal({
+    title: '💾 Kopia zapasowa?',
+    message: 'Czy chcesz pobrać plik kopii zapasowej ze wszystkimi danymi?'
+  });
+
+  if (shouldBackup) {
+    try {
+      const data = await exportAllData();
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gymtracker-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('✅ Kopia zapasowa pobrana', 'success');
+    } catch (e) {
+      showToast('❌ Błąd tworzenia kopii', 'error');
+    }
+  }
+
   showScreen('screen-home', 'GymTracker Pro');
 }
 // --- MEASUREMENTS ---
@@ -1374,6 +1396,36 @@ function renderCalendar(year, month) {
 
     currentCalendarYear = year;
     currentCalendarMonth = month;
+
+    // Nawigacja – musimy ją ponownie podpiąć, bo przyciski są poza gridem
+    document.getElementById('calendar-prev')?.addEventListener('click', () => {
+      if (currentCalendarMonth === 0) {
+        currentCalendarMonth = 11;
+        currentCalendarYear--;
+      } else {
+        currentCalendarMonth--;
+      }
+      renderCalendar(currentCalendarYear, currentCalendarMonth);
+    });
+
+    document.getElementById('calendar-next')?.addEventListener('click', () => {
+      if (currentCalendarMonth === 11) {
+        currentCalendarMonth = 0;
+        currentCalendarYear++;
+      } else {
+        currentCalendarMonth++;
+      }
+      renderCalendar(currentCalendarYear, currentCalendarMonth);
+    });
+
+    document.getElementById('calendar-today')?.addEventListener('click', () => {
+      const now = new Date();
+      currentCalendarYear = now.getFullYear();
+      currentCalendarMonth = now.getMonth();
+      renderCalendar(currentCalendarYear, currentCalendarMonth);
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      showDayDetails(todayStr);
+    });
   });
 }
 
@@ -1502,7 +1554,7 @@ async function addWorkoutToDayByIndex(dateStr, index) {
           exerciseId: exId,
           name: ex ? ex.name : 'Ćwiczenie',
           type: 'strength',
-          muscle: ex ? ex.muscle : 'Inne', // <--- TO JEST KLUCZOWE
+          muscle: ex ? ex.muscle : 'Inne',
           sets: sets
         };
       });
@@ -1537,6 +1589,28 @@ async function addWorkoutToDayByIndex(dateStr, index) {
     
     renderCalendar(currentCalendarYear, currentCalendarMonth);
     showDayDetails(dateStr);
+
+    // 🔥 Zapytaj o kopię zapasową
+    const shouldBackup = await showConfirmModal({
+      title: '💾 Kopia zapasowa?',
+      message: 'Czy chcesz pobrać plik kopii zapasowej ze wszystkimi danymi?'
+    });
+
+    if (shouldBackup) {
+      try {
+        const data = await exportAllData();
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `gymtracker-backup-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('✅ Kopia zapasowa pobrana', 'success');
+      } catch (e) {
+        showToast('❌ Błąd tworzenia kopii', 'error');
+      }
+    }
     
   } catch (e) {
     console.error(e);
@@ -2121,3 +2195,53 @@ function switchStatsTab(tabType) {
     }
   }
 }
+
+// ============================================
+// WAKE LOCK – ZAPOBIEGA UŚPIENIU EKRANU
+// ============================================
+
+let wakeLock = null;
+
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      console.log('🔆 Wake Lock aktywny – ekran pozostanie włączony');
+      
+      document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible' && wakeLock === null) {
+          try {
+            wakeLock = await navigator.wakeLock.request('screen');
+          } catch (e) { /* ignore */ }
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('Wake Lock nie jest wspierany:', err);
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) {
+    try {
+      wakeLock.release();
+      wakeLock = null;
+      console.log('🔆 Wake Lock zwolniony');
+    } catch (e) { /* ignore */ }
+  }
+}
+
+// Nadpisujemy oryginalną funkcję startWorkout – dodajemy Wake Lock
+const originalStartWorkout = window.startWorkout || startWorkout;
+startWorkout = async function(workoutId) {
+  await requestWakeLock();
+  await originalStartWorkout(workoutId);
+};
+
+// Nadpisujemy finishWorkout – zwalniamy lock (już zrobione wyżej)
+// Nadpisujemy cancelActivity – zwalniamy lock
+const originalCancelActivity = window.cancelActivity || cancelActivity;
+cancelActivity = function() {
+  releaseWakeLock();
+  originalCancelActivity();
+};
