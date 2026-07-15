@@ -16,7 +16,7 @@ if (isLocalFile) {
 // ZARZĄDZANIE WERSJĄ I AKTUALIZACJAMI
 // ============================================
 
-const APP_VERSION = '1.1.3';
+const APP_VERSION = '1.1.4';
 let swRegistration = null;
 let updateBannerShown = false;
 
@@ -337,13 +337,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   const msDate = document.getElementById('ms-date');
   if (msDate) msDate.valueAsDate = new Date();
 
+  // ============================================
+  // PRZYWROCENIE STANU TRENINGU (z opcją anulowania)
+  // ============================================
   const saved = localStorage.getItem('gym-autosave');
   if (saved) {
     try {
       const data = JSON.parse(saved);
       if (Date.now() - data.timestamp < 24 * 60 * 60 * 1000 && data.activeWorkout) {
-        const confirmRestore = confirm('Odnaleziono niezakończony trening. Kontynuować?');
-        if (confirmRestore) {
+        const choice = confirm('Odnaleziono niezakończony trening. Kontynuować? Kliknij Anuluj, aby usunąć ten stan.');
+        if (choice) {
+          // Przywracanie – oryginalny kod
           if (window.WorkoutState) {
             window.WorkoutState.restore(data);
           }
@@ -369,7 +373,16 @@ document.addEventListener('DOMContentLoaded', async () => {
               if (typeof renderActiveWorkout === 'function') renderActiveWorkout();
             });
           }
+        } else {
+          // USUŃ ZAPISANY STAN
+          localStorage.removeItem('gym-autosave');
+          if (window.WorkoutState) window.WorkoutState.reset();
+          if (typeof resetActivityState === 'function') resetActivityState();
+          showToast('Stan treningu został usunięty', 'info');
         }
+      } else {
+        // stary lub nieaktywny – usuń
+        localStorage.removeItem('gym-autosave');
       }
     } catch(e) { console.warn('Auto-restore failed', e); }
   }
@@ -901,17 +914,14 @@ async function updateStatsChart(tabType) {
     if (typeof renderStatsSummary === 'function') renderStatsSummary(stats, 'weight-chart');
 
   } else if (tabType === 'volume-chart') {
-    // Sprawdzamy czy wybrano ćwiczenie - jeśli nie, czyścimy wykres i podsumowanie
     if (!exerciseId || exerciseId === '') {
       if (typeof renderStatsChart === 'function') renderStatsChart('volume-chart', [], [], t('select_exercise'));
       if (typeof renderStatsSummary === 'function') renderStatsSummary([], 'volume-chart');
       return;
     }
     
-    // Pobieramy statystyki dla konkretnego ćwiczenia
     const volumeStats = await getExerciseStats(parseInt(exerciseId)); 
     const labels = volumeStats.map(s => s.date.split('T')[0]);
-    // Mapujemy dane na obiekt z kluczem 'volume', którego oczekuje Chart.js w ui.js
     const data = volumeStats.map(s => ({ volume: s.totalVolume }));
     const exercise = await getExercise(parseInt(exerciseId));
     
@@ -920,7 +930,6 @@ async function updateStatsChart(tabType) {
     }
     
     if (typeof renderStatsSummary === 'function') {
-      // Przekazujemy przemapowane dane, aby renderStatsSummary poprawnie wyliczyło średnie i maksima
       const summaryData = volumeStats.map(s => ({
         maxWeight: s.maxWeight,
         weight: s.maxWeight, 
