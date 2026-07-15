@@ -411,14 +411,16 @@ window.WorkoutState = {
 };
 
 // ============================================
-// AKTYWNOŚCI OGÓLNE - STAN
+// AKTYWNOŚCI OGÓLNE - STAN (POPRAWIONY)
 // ============================================
 
 window.ActivityState = {
   activeActivity: null,
   startTime: null,
+  lastTickTime: null,   // <-- NOWE: punkt odniesienia dla delty
   timerInterval: null,
-  seconds: 0
+  seconds: 0,
+  isPaused: false       // <-- NOWE: stan pauzy
 };
 
 window.ActivityTimerState = {
@@ -429,6 +431,8 @@ window.ActivityTimerState = {
 function resetActivityState() {
   window.ActivityState.activeActivity = null;
   window.ActivityState.startTime = null;
+  window.ActivityState.lastTickTime = null;
+  window.ActivityState.isPaused = false;
   if (window.ActivityState.timerInterval) {
     clearInterval(window.ActivityState.timerInterval);
     window.ActivityState.timerInterval = null;
@@ -437,7 +441,7 @@ function resetActivityState() {
 }
 
 // ============================================
-// LOGIKA AKTYWNOŚCI
+// LOGIKA AKTYWNOŚCI (POPRAWIONY STOPER)
 // ============================================
 
 async function startActivity(workoutId) {
@@ -454,7 +458,6 @@ async function startActivity(workoutId) {
   }
 
   resetActivityState();
-  resetActivityTimer();
 
   window.ActivityState.activeActivity = {
     workoutId: workout.id,
@@ -465,6 +468,7 @@ async function startActivity(workoutId) {
     note: '',
     startTime: null
   };
+  window.ActivityState.isPaused = false;
 
   document.getElementById('activity-name').textContent = exercise.name;
   document.getElementById('activity-timer').textContent = '0:00';
@@ -487,21 +491,46 @@ async function startActivity(workoutId) {
   });
 }
 
+// 🟢 NOWA: funkcja do aktualizacji stopera (wydzielona logika)
+function updateActivityTimerLogic() {
+  if (window.ActivityState.lastTickTime && !window.ActivityState.isPaused) {
+    const now = Date.now();
+    const delta = Math.floor((now - window.ActivityState.lastTickTime) / 1000);
+    
+    if (delta >= 1) {
+      window.ActivityState.seconds += delta;
+      window.ActivityState.lastTickTime += delta * 1000;
+    }
+
+    const timerEl = document.getElementById('activity-timer');
+    if (timerEl) {
+      timerEl.textContent = formatTime(window.ActivityState.seconds);
+    }
+  }
+}
+
+// 🟢 NOWA: start stopera z deltą
 function startActivityTimer() {
-  window.ActivityState.startTime = Date.now();
-  window.ActivityState.seconds = 0;
+  // Zapisujemy moment kliknięcia "Start/Wznów"
+  window.ActivityState.lastTickTime = Date.now();
+  window.ActivityState.isPaused = false;
 
   if (window.ActivityState.timerInterval) {
     clearInterval(window.ActivityState.timerInterval);
   }
 
   window.ActivityState.timerInterval = setInterval(() => {
-    window.ActivityState.seconds = Math.floor((Date.now() - window.ActivityState.startTime) / 1000);
-    const timerEl = document.getElementById('activity-timer');
-    if (timerEl) {
-      timerEl.textContent = formatTime(window.ActivityState.seconds);
-    }
+    updateActivityTimerLogic();
   }, 1000);
+
+  // Natychmiastowa aktualizacja
+  updateActivityTimerLogic();
+
+  const btn = document.getElementById('btn-start-timer');
+  if (btn) {
+    btn.textContent = t('stop_timer');
+    btn.style.background = 'var(--danger)';
+  }
 }
 
 function stopActivityTimer() {
@@ -509,10 +538,51 @@ function stopActivityTimer() {
     clearInterval(window.ActivityState.timerInterval);
     window.ActivityState.timerInterval = null;
   }
+  // Nie resetujemy lastTickTime – zostawiamy do ewentualnego wznowienia
+  window.ActivityState.isPaused = true;
+}
+
+function resetActivityTimer() {
+  stopActivityTimer();
+  window.ActivityState.seconds = 0;
+  window.ActivityState.lastTickTime = null;
+  window.ActivityState.isPaused = false;
+  
+  const timerEl = document.getElementById('activity-timer');
+  if (timerEl) timerEl.textContent = '0:00';
+  
+  const btn = document.getElementById('btn-start-timer');
+  if (btn) {
+    btn.textContent = t('start_timer');
+    btn.style.background = '';
+  }
+}
+
+function toggleActivityTimer() {
+  const btn = document.getElementById('btn-start-timer');
+  if (!btn) return;
+  
+  if (window.ActivityState.timerInterval && !window.ActivityState.isPaused) {
+    // Stoper działa – zatrzymujemy (pauza)
+    stopActivityTimer();
+    btn.textContent = t('resume_timer');
+    btn.style.background = 'var(--success)';
+  } else {
+    // Stoper zatrzymany lub zapauzowany – wznawiamy
+    startActivityTimer();
+    btn.textContent = t('stop_timer');
+    btn.style.background = 'var(--danger)';
+  }
 }
 
 async function finishActivity() {
-  if (!window.ActivityState.activeActivity) return;
+  if (!window.ActivityState.activeActivity) {
+    localStorage.removeItem('gym-autosave');
+    resetActivityState();
+    resetActivityTimer();
+    showScreen('screen-home', 'GymTracker Pro');
+    return;
+  }
 
   const confirmed = await showConfirmModal({
     title: '🏃 ' + t('finish_activity'),
@@ -551,13 +621,21 @@ async function finishActivity() {
 
   resetActivityState();
   resetActivityTimer();
+  localStorage.removeItem('gym-autosave');
   renderWorkoutsList();
   renderHistoryList();
   showScreen('screen-home', 'GymTracker Pro');
 }
 
 function cancelActivity() {
-  if (!window.ActivityState.activeActivity) return;
+  // Jeśli nie ma aktywnej aktywności – wyczyść stan i wróć
+  if (!window.ActivityState.activeActivity) {
+    localStorage.removeItem('gym-autosave');
+    resetActivityState();
+    resetActivityTimer();
+    showScreen('screen-home', 'GymTracker Pro');
+    return;
+  }
 
   const confirmed = confirm(t('confirm_delete'));
   if (!confirmed) return;
@@ -565,38 +643,8 @@ function cancelActivity() {
   stopActivityTimer();
   resetActivityTimer();
   resetActivityState();
+  localStorage.removeItem('gym-autosave');
   showScreen('screen-home', 'GymTracker Pro');
-}
-
-// ============================================
-// STEROWANIE STOPEREM AKTYWNOŚCI
-// ============================================
-function toggleActivityTimer() {
-  const btn = document.getElementById('btn-start-timer');
-  if (!btn) return;
-  
-  if (window.ActivityState.timerInterval) {
-    stopActivityTimer();
-    btn.textContent = t('resume_timer');
-    btn.style.background = 'var(--success)';
-  } else {
-    startActivityTimer();
-    btn.textContent = t('stop_timer');
-    btn.style.background = 'var(--danger)';
-  }
-}
-
-function resetActivityTimer() {
-  stopActivityTimer();
-  window.ActivityState.seconds = 0;
-  window.ActivityState.startTime = null;
-  const timerEl = document.getElementById('activity-timer');
-  if (timerEl) timerEl.textContent = '0:00';
-  const btn = document.getElementById('btn-start-timer');
-  if (btn) {
-    btn.textContent = t('start_timer');
-    btn.style.background = '';
-  }
 }
 
 // ============================================
