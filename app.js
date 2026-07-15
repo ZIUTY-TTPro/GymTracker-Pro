@@ -16,7 +16,7 @@ if (isLocalFile) {
 // ZARZĄDZANIE WERSJĄ I AKTUALIZACJAMI
 // ============================================
 
-const APP_VERSION = '1.1.4';
+const APP_VERSION = '1.1.6';
 let swRegistration = null;
 let updateBannerShown = false;
 
@@ -316,7 +316,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await renderWorkoutActivitySelect();
   } catch (e) { console.error('renderWorkoutActivitySelect error:', e); }
 
-  // NIE ustawiamy żadnego ćwiczenia – czekamy na wybór użytkownika
   const statsSelect = document.getElementById('stats-exercise-select');
   if (statsSelect) {
     statsSelect.value = '';
@@ -347,7 +346,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (Date.now() - data.timestamp < 24 * 60 * 60 * 1000 && data.activeWorkout) {
         const choice = confirm('Odnaleziono niezakończony trening. Kontynuować? Kliknij Anuluj, aby usunąć ten stan.');
         if (choice) {
-          // Przywracanie – oryginalny kod
           if (window.WorkoutState) {
             window.WorkoutState.restore(data);
           }
@@ -374,14 +372,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
           }
         } else {
-          // USUŃ ZAPISANY STAN
           localStorage.removeItem('gym-autosave');
           if (window.WorkoutState) window.WorkoutState.reset();
           if (typeof resetActivityState === 'function') resetActivityState();
           showToast('Stan treningu został usunięty', 'info');
         }
       } else {
-        // stary lub nieaktywny – usuń
         localStorage.removeItem('gym-autosave');
       }
     } catch(e) { console.warn('Auto-restore failed', e); }
@@ -722,9 +718,9 @@ document.getElementById('btn-start-timer')?.addEventListener('click', () => {
     if (typeof completeRound === 'function') completeRound();
   });
 
-  document.getElementById('btn-finish-workout')?.addEventListener('click', () => {
-    if (typeof finishWorkout === 'function') finishWorkout();
-  });
+  // ---- PRZYCISK ZAKOŃCZ TRENING ----
+  // Listener jest podpinany dynamicznie w renderActiveWorkout() w ui.js
+  // oraz przez atrybut onclick w HTML
 
   document.querySelectorAll('.stats-tabs .tab-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
