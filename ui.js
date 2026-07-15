@@ -417,10 +417,10 @@ window.WorkoutState = {
 window.ActivityState = {
   activeActivity: null,
   startTime: null,
-  lastTickTime: null,   // <-- NOWE: punkt odniesienia dla delty
+  lastTickTime: null,
   timerInterval: null,
   seconds: 0,
-  isPaused: false       // <-- NOWE: stan pauzy
+  isPaused: false
 };
 
 window.ActivityTimerState = {
@@ -491,7 +491,6 @@ async function startActivity(workoutId) {
   });
 }
 
-// 🟢 NOWA: funkcja do aktualizacji stopera (wydzielona logika)
 function updateActivityTimerLogic() {
   if (window.ActivityState.lastTickTime && !window.ActivityState.isPaused) {
     const now = Date.now();
@@ -509,9 +508,7 @@ function updateActivityTimerLogic() {
   }
 }
 
-// 🟢 NOWA: start stopera z deltą
 function startActivityTimer() {
-  // Zapisujemy moment kliknięcia "Start/Wznów"
   window.ActivityState.lastTickTime = Date.now();
   window.ActivityState.isPaused = false;
 
@@ -523,7 +520,6 @@ function startActivityTimer() {
     updateActivityTimerLogic();
   }, 1000);
 
-  // Natychmiastowa aktualizacja
   updateActivityTimerLogic();
 
   const btn = document.getElementById('btn-start-timer');
@@ -538,7 +534,6 @@ function stopActivityTimer() {
     clearInterval(window.ActivityState.timerInterval);
     window.ActivityState.timerInterval = null;
   }
-  // Nie resetujemy lastTickTime – zostawiamy do ewentualnego wznowienia
   window.ActivityState.isPaused = true;
 }
 
@@ -563,12 +558,10 @@ function toggleActivityTimer() {
   if (!btn) return;
   
   if (window.ActivityState.timerInterval && !window.ActivityState.isPaused) {
-    // Stoper działa – zatrzymujemy (pauza)
     stopActivityTimer();
     btn.textContent = t('resume_timer');
     btn.style.background = 'var(--success)';
   } else {
-    // Stoper zatrzymany lub zapauzowany – wznawiamy
     startActivityTimer();
     btn.textContent = t('stop_timer');
     btn.style.background = 'var(--danger)';
@@ -624,11 +617,36 @@ async function finishActivity() {
   localStorage.removeItem('gym-autosave');
   renderWorkoutsList();
   renderHistoryList();
+
+  // 🕒 Krótkie opóźnienie, aby przeglądarka zdążyła zamknąć poprzedni modal
+  await new Promise(resolve => setTimeout(resolve, 300));
+
+  // 🔥 Zapytaj o kopię zapasową
+  const shouldBackup = await showConfirmModal({
+    title: '💾 Kopia zapasowa?',
+    message: 'Czy chcesz pobrać plik kopii zapasowej ze wszystkimi danymi?'
+  });
+
+  if (shouldBackup) {
+    try {
+      const data = await exportAllData();
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gymtracker-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('✅ Kopia zapasowa pobrana', 'success');
+    } catch (e) {
+      showToast('❌ Błąd tworzenia kopii', 'error');
+    }
+  }
+
   showScreen('screen-home', 'GymTracker Pro');
 }
 
 function cancelActivity() {
-  // Jeśli nie ma aktywnej aktywności – wyczyść stan i wróć
   if (!window.ActivityState.activeActivity) {
     localStorage.removeItem('gym-autosave');
     resetActivityState();
@@ -1079,15 +1097,17 @@ function showConfirmModal(options) {
   return new Promise((resolve) => {
     const modal = document.getElementById('confirm-modal');
     const titleEl = document.getElementById('modal-title');
+    const messageEl = document.getElementById('modal-message');
     const confirmBtn = document.getElementById('modal-confirm');
     const cancelBtn = document.getElementById('modal-cancel');
 
     if (!modal) {
-      resolve(confirm(options.message || t('confirm_delete')));
+      resolve(confirm((options.title ? options.title + '\n' : '') + (options.message || t('confirm_delete'))));
       return;
     }
 
     if (titleEl) titleEl.textContent = options.title || t('confirm_finish_workout');
+    if (messageEl) messageEl.innerHTML = options.message || '';
 
     modal.classList.remove('hidden');
 
@@ -1123,6 +1143,8 @@ function showConfirmModal(options) {
 
 async function finishWorkout() {
   if (!window.WorkoutState.activeWorkout) return;
+
+  console.log('🔥 finishWorkout() został wywołany!');
 
   const isLastRound = (window.WorkoutState.currentRound + 1 === window.WorkoutState.activeWorkout.totalSets);
   const doneCount = window.WorkoutState.activeWorkout.exercises.filter(ex => ex.rounds[window.WorkoutState.currentRound].completed).length;
@@ -1190,6 +1212,9 @@ async function finishWorkout() {
   await loadSessionsData();
   renderCalendar(currentCalendarYear, currentCalendarMonth);
   
+  // 🕒 Krótkie opóźnienie, aby przeglądarka zdążyła zamknąć poprzedni modal
+  await new Promise(resolve => setTimeout(resolve, 300));
+
   // 🔥 Zapytaj o kopię zapasową
   const shouldBackup = await showConfirmModal({
     title: '💾 Kopia zapasowa?',
@@ -1214,6 +1239,7 @@ async function finishWorkout() {
 
   showScreen('screen-home', 'GymTracker Pro');
 }
+
 // --- MEASUREMENTS ---
 async function renderMeasurementsHistory() {
   const container = document.getElementById('measurements-history');
@@ -1442,7 +1468,6 @@ function renderCalendar(year, month) {
     currentCalendarYear = year;
     currentCalendarMonth = month;
 
-    // Inicjalizacja nawigacji (tylko raz)
     if (!window._calendarNavInitialized) {
       initCalendarNavigation();
       window._calendarNavInitialized = true;
@@ -1460,11 +1485,9 @@ async function addWorkoutToDay(dateStr) {
     return;
   }
 
-  // Pokaż modal z listą treningów
   const modal = document.getElementById('workout-select-modal');
   const listContainer = document.getElementById('workout-select-list');
   if (!modal || !listContainer) {
-    // Fallback do prompt jeśli modal nie istnieje
     const options = workouts.map((wo, i) => 
       `${i + 1}. ${wo.name}${wo.type === 'activity' ? ' 🏃' : ''}`
     ).join('\n');
@@ -1479,7 +1502,6 @@ async function addWorkoutToDay(dateStr) {
     return;
   }
 
-  // Przygotuj listę
   listContainer.innerHTML = '';
   workouts.forEach((wo, index) => {
     const div = document.createElement('div');
@@ -1511,11 +1533,9 @@ async function addWorkoutToDay(dateStr) {
 
   modal.classList.remove('hidden');
 
-  // Anuluj
   document.getElementById('workout-select-cancel')?.addEventListener('click', () => {
     modal.classList.add('hidden');
   });
-  // Kliknięcie w tło
   modal.addEventListener('click', (e) => {
     if (e.target === modal) modal.classList.add('hidden');
   });
@@ -1611,7 +1631,8 @@ async function addWorkoutToDayByIndex(dateStr, index) {
     renderCalendar(currentCalendarYear, currentCalendarMonth);
     showDayDetails(dateStr);
 
-    // 🔥 Zapytaj o kopię zapasową
+    await new Promise(resolve => setTimeout(resolve, 300));
+
     const shouldBackup = await showConfirmModal({
       title: '💾 Kopia zapasowa?',
       message: 'Czy chcesz pobrać plik kopii zapasowej ze wszystkimi danymi?'
@@ -1638,6 +1659,7 @@ async function addWorkoutToDayByIndex(dateStr, index) {
     showToast(t('error'), 'error');
   }
 }
+
 async function showDayDetails(dateStr) {
   const container = document.getElementById('day-details');
   if (!container) return;
@@ -1722,7 +1744,6 @@ async function showDayDetails(dateStr) {
 
   container.innerHTML = html;
 
-  // NASŁUCHIWACZ DLA PRZYCISKU "DODAJ TRENING" – ZAWSZE
   document.getElementById('add-workout-to-day')?.addEventListener('click', () => {
     addWorkoutToDay(dateStr);
   });
@@ -1788,7 +1809,6 @@ function initCalendarNavigation() {
     const newToday = todayBtn.cloneNode(true);
     todayBtn.parentNode.replaceChild(newToday, todayBtn);
     
-    // Tłumaczenie przycisku "Dziś"
     const todayKey = newToday.getAttribute('data-key') || 'today';
     newToday.textContent = t(todayKey);
     
@@ -2289,7 +2309,6 @@ startWorkout = async function(workoutId) {
   await originalStartWorkout(workoutId);
 };
 
-// Nadpisujemy finishWorkout – zwalniamy lock (już zrobione wyżej)
 // Nadpisujemy cancelActivity – zwalniamy lock
 const originalCancelActivity = window.cancelActivity || cancelActivity;
 cancelActivity = function() {
